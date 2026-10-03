@@ -107,8 +107,22 @@ export class KrakowCityAdapter implements CityAdapter {
     }
   }
 
-  getApplicationTemplate(): ApplicationTemplate {
-    return applicationTemplate
+  getApplicationTemplate(
+    projectType: 'investment' | 'non_investment' = 'investment',
+  ): ApplicationTemplate {
+    const baseFields = applicationTemplate.fields.filter(
+      (field) =>
+        projectType === 'investment' ||
+        (field.id !== 'costEstimate' && field.id !== 'schedule'),
+    )
+    const variant = applicationTemplate.variantFields[projectType]
+    const merged = [...baseFields]
+    for (const field of variant) {
+      const idx = merged.findIndex((f) => f.id === field.id)
+      if (idx >= 0) merged[idx] = field
+      else merged.push(field)
+    }
+    return { ...applicationTemplate, fields: merged }
   }
 
   getCostCatalog(): CostCatalog {

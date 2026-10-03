@@ -44,9 +44,10 @@ App lokalnie: http://127.0.0.1:5173/
 ### Seed / reset (Supabase SQL Editor)
 
 1. `supabase/seed/reset_demo.sql` (opcjonalnie)
-2. `supabase/seed/demo_scenario.sql`
-3. `supabase/migrations/PASTE_ME_spatial_likers.sql` (RPC filtrów i likerów)
-4. Wcześniejsze: schema, lat/lng, storage — patrz `supabase/migrations/`
+2. `supabase/seed/demo_fake_profiles.sql` (~18 profili do lajków)
+3. `supabase/seed/demo_scenario.sql` (pomysły, lajki z rekordów, komentarze)
+4. `supabase/migrations/PASTE_ME_spatial_likers.sql` (RPC filtrów i likerów)
+5. Wcześniejsze: schema, lat/lng, storage — patrz `supabase/migrations/`
 
 Szczegóły: `supabase/seed/demo_accounts.md`.
 

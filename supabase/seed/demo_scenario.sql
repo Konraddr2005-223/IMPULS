@@ -1,8 +1,8 @@
--- PASTE in Supabase SQL Editor after profiles for autor/sasiad exist.
+-- PASTE in Supabase SQL Editor after:
+--   1) auth users autor@example.com + sasiad@example.com
+--   2) demo_fake_profiles.sql (~18 likerów)
 -- Seeds presentation scenario (§7). Safe to re-run after reset_demo.sql.
-
--- Requires: cities.krakow, auth users for autor@example.com and sasiad@example.com
--- with matching public.profiles rows.
+-- Like counts MUST come from idea_likes rows (not independent counters).
 
 do $$
 declare
@@ -11,6 +11,11 @@ declare
   v_idea1 uuid;
   v_idea2 uuid;
   v_idea3 uuid;
+  v_idea4 uuid;
+  v_idea5 uuid;
+  v_idea6 uuid;
+  v_likers uuid[];
+  v_n int;
 begin
   select id into v_autor from auth.users where email = 'autor@example.com' limit 1;
   select id into v_sasiad from auth.users where email = 'sasiad@example.com' limit 1;
@@ -19,13 +24,22 @@ begin
     raise exception 'Create demo auth users autor@example.com and sasiad@example.com first';
   end if;
 
+  select array_agg(u.id order by u.email)
+  into v_likers
+  from auth.users u
+  where u.email like 'demo.liker.%@example.com';
+
+  if v_likers is null or coalesce(array_length(v_likers, 1), 0) < 18 then
+    raise exception 'Run demo_fake_profiles.sql first (need 18 demo.liker.* users, got %)',
+      coalesce(array_length(v_likers, 1), 0);
+  end if;
+
   insert into public.profiles (id, display_name)
   values
     (v_autor, 'Autor demo'),
     (v_sasiad, 'Sąsiad demo')
   on conflict (id) do update set display_name = excluded.display_name;
 
-  -- Clear previous demo-tagged content (by known titles / demo flag in description prefix)
   delete from public.notifications
   where recipient_id in (v_autor, v_sasiad)
     and event_key like 'demo:%';
@@ -48,11 +62,17 @@ begin
   where idea_id in (
     select id from public.ideas
     where author_id = v_autor
-      and title = 'Zielony zakątek z ławkami'
+      and title in (
+        'Zielony zakątek z ławkami',
+        'Więcej cienia przy trasie spacerowej',
+        'Miejsce odpoczynku dla seniorów',
+        'Sąsiedzkie warsztaty naprawcze',
+        'Piknik na terenie instytucji',
+        'Skwer na terenie innego podmiotu'
+      )
   );
 
-  delete from public.applications
-  where author_id = v_autor;
+  delete from public.applications where author_id = v_autor;
 
   delete from public.faults
   where author_id in (v_autor, v_sasiad)
@@ -69,7 +89,6 @@ begin
       'Skwer na terenie innego podmiotu'
     );
 
-  -- Main scenario idea (presentation-B municipal point near Krowodrza demo)
   insert into public.ideas (
     id, city_id, author_id, title, description, category, location,
     district_code, support_threshold, status
@@ -130,27 +149,70 @@ begin
   select id into v_idea2 from public.ideas
   where title = 'Więcej cienia przy trasie spacerowej' and author_id = v_autor limit 1;
   select id into v_idea3 from public.ideas
+  where title = 'Miejsce odpoczynku dla seniorów' and author_id = v_autor limit 1;
+  select id into v_idea4 from public.ideas
+  where title = 'Sąsiedzkie warsztaty naprawcze' and author_id = v_autor limit 1;
+  select id into v_idea5 from public.ideas
+  where title = 'Piknik na terenie instytucji' and author_id = v_autor limit 1;
+  select id into v_idea6 from public.ideas
   where title = 'Skwer na terenie innego podmiotu' and author_id = v_autor limit 1;
 
-  -- Likes: main idea 2/3 (autor + sasiad) — third like unlocks AI in demo
+  -- Main: 2/3 (autor + sasiad) — third like unlocks generator
   insert into public.idea_likes (idea_id, user_id) values
     (v_idea1, v_autor),
     (v_idea1, v_sasiad)
   on conflict do nothing;
 
-  -- Extra likes on secondary ideas
-  insert into public.idea_likes (idea_id, user_id)
-  select v_idea2, v_sasiad
-  on conflict do nothing;
+  -- Spec §7 targets: 18 / 12 / 8 / 6 / 4 from fake likers
+  for v_n in 1..18 loop
+    insert into public.idea_likes (idea_id, user_id)
+    values (v_idea2, v_likers[v_n])
+    on conflict do nothing;
+  end loop;
 
-  -- Comments on main idea
+  for v_n in 1..12 loop
+    insert into public.idea_likes (idea_id, user_id)
+    values (v_idea3, v_likers[v_n])
+    on conflict do nothing;
+  end loop;
+
+  for v_n in 1..8 loop
+    insert into public.idea_likes (idea_id, user_id)
+    values (v_idea4, v_likers[v_n])
+    on conflict do nothing;
+  end loop;
+
+  for v_n in 1..6 loop
+    insert into public.idea_likes (idea_id, user_id)
+    values (v_idea5, v_likers[v_n])
+    on conflict do nothing;
+  end loop;
+
+  for v_n in 1..4 loop
+    insert into public.idea_likes (idea_id, user_id)
+    values (v_idea6, v_likers[v_n])
+    on conflict do nothing;
+  end loop;
+
+  -- 16 comments across ideas (§7: 12–20)
   insert into public.comments (idea_id, author_id, body, status) values
     (v_idea1, v_sasiad, 'Fajnie, gdyby ławki miały oparcie i były w cieniu.', 'visible'),
     (v_idea1, v_autor, 'Celujemy w dwie ławki i cztery drzewa z katalogu BO.', 'visible'),
     (v_idea1, v_sasiad, 'Przydałby się też kosz — ale to osobny koszt.', 'visible'),
-    (v_idea3, v_sasiad, 'Tu grunt wygląda na problematyczny — warto ostrzec.', 'visible');
+    (v_idea1, v_likers[1], 'Popieram — brakuje miejsc do odpoczynku na trasie.', 'visible'),
+    (v_idea2, v_likers[2], 'Cień latem jest pilniejszy niż kolejne donice.', 'visible'),
+    (v_idea2, v_likers[3], 'Warto dobrać gatunki odporne na warunki miejskie.', 'visible'),
+    (v_idea2, v_sasiad, 'Ranking zieleni — ten pomysł powinien być wysoko.', 'visible'),
+    (v_idea3, v_likers[4], 'Seniorzy potrzebują ławki z oparciem i poręczami.', 'visible'),
+    (v_idea3, v_likers[5], 'Dobrze, jeśli dojście będzie równe i bez wysokich krawężników.', 'visible'),
+    (v_idea3, v_autor, 'Uwzględnimy dostępność w opisie wniosku.', 'visible'),
+    (v_idea4, v_likers[6], 'Warsztaty bez inwestycji budowlanej — super dla Nowej Huty.', 'visible'),
+    (v_idea4, v_likers[7], 'Potrzebna sala i narzędzia — bez trwałej zabudowy.', 'visible'),
+    (v_idea5, v_likers[8], 'Trzeba uzgodnić współpracę z instytucją gospodarującą terenem.', 'visible'),
+    (v_idea5, v_sasiad, 'Piknik tylko po pisemnej zgodzie — dopiszcie to do wniosku.', 'visible'),
+    (v_idea6, v_sasiad, 'Tu grunt wygląda na problematyczny — warto ostrzec.', 'visible'),
+    (v_idea6, v_likers[9], 'Przenieście lokalizację na grunt gminny z demo B.', 'visible');
 
-  -- Faults
   insert into public.faults (
     city_id, author_id, category, description, location, status, status_source
   ) values
@@ -179,7 +241,6 @@ begin
     'new', 'author'
   );
 
-  -- Notifications: one unread for neighbor, one read for author
   insert into public.notifications (recipient_id, idea_id, type, event_key, payload, read_at)
   values
   (
@@ -200,5 +261,6 @@ begin
   )
   on conflict (recipient_id, event_key) do nothing;
 
-  raise notice 'Demo seed OK. Main idea id=% (likes should be 2/3)', v_idea1;
+  raise notice 'Demo seed OK. Main=% (2/3), cień=18, seniorzy=12, warsztaty=8, piknik=6, skwer=4',
+    v_idea1;
 end $$;

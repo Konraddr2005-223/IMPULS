@@ -42,6 +42,24 @@ export const applicationTemplate: ApplicationTemplate = {
     { id: 'costEstimate', label: 'Kosztorys', required: true },
     { id: 'schedule', label: 'Harmonogram', required: true },
   ],
+  variantFields: {
+    investment: [
+      { id: 'costEstimate', label: 'Kosztorys inwestycyjny', required: true },
+      { id: 'schedule', label: 'Harmonogram robót', required: true },
+    ],
+    non_investment: [
+      {
+        id: 'participants',
+        label: 'Uczestnicy / odbiorcy',
+        required: true,
+      },
+      {
+        id: 'equipment',
+        label: 'Materiały i sprzęt (bez inwestycji budowlanej)',
+        required: false,
+      },
+    ],
+  },
   notes: [
     'Lajki w aplikacji nie zastępują oficjalnej listy poparcia BO.',
     'Wymagane jest co najmniej 15 podpisów mieszkańców właściwej dzielnicy lub Krakowa, zależnie od zasięgu projektu.',

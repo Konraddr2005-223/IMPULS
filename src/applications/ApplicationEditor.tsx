@@ -6,6 +6,8 @@ import { sendVotingReminderDemo } from '../notifications/votingReminder'
 import { copy } from '../ui/copy'
 import { saveApplicationContent } from './api'
 import { calculateCosts, formatPlnRange } from './costs'
+import { FALLBACK_EXAMPLE_APPLICATION } from './fallbackExample'
+import { copyApplicationToClipboard } from './formatDocument'
 import {
   publishApplicationSummary,
   reportSignatures,
@@ -32,8 +34,11 @@ export function ApplicationEditor({
   const [content, setContent] = useState<ApplicationContent | null>(
     initial.content_json,
   )
+  const projectType =
+    content?.projectType ??
+    (content?.participants != null ? 'non_investment' : 'investment')
   const instructions = krakowAdapter.getSubmissionInstructions()
-  const template = krakowAdapter.getApplicationTemplate()
+  const template = krakowAdapter.getApplicationTemplate(projectType)
   const catalog = krakowAdapter.getCostCatalog()
   const [officialId, setOfficialId] = useState(initial.official_project_id ?? '')
   const [message, setMessage] = useState<string | null>(null)
@@ -80,7 +85,19 @@ export function ApplicationEditor({
     <div className="flex-1 mx-auto w-full max-w-3xl px-4 py-6 print:max-w-none print:px-0 overflow-y-auto">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-4 print:hidden">
         <h2 className="m-0 text-lg font-semibold">Roboczy wniosek BO</h2>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() =>
+              withFeedback(async () => {
+                await copyApplicationToClipboard(content)
+                setMessage('Skopiowano treść wniosku do schowka.')
+              })
+            }
+            className="min-h-11 px-4 rounded-[var(--radius-card)] border border-black/10 bg-white text-sm font-medium cursor-pointer"
+          >
+            Kopiuj
+          </button>
           <button
             type="button"
             onClick={() => window.print()}
@@ -91,6 +108,17 @@ export function ApplicationEditor({
           </button>
           <button
             type="button"
+            onClick={() => {
+              setContent({ ...FALLBACK_EXAMPLE_APPLICATION })
+              setMessage('Wczytano przykład awaryjny (oznaczony w ostrzeżeniach).')
+              setError(null)
+            }}
+            className="min-h-11 px-4 rounded-[var(--radius-card)] border border-black/10 bg-[var(--color-bg)] text-sm font-medium cursor-pointer"
+          >
+            Przykład awaryjny
+          </button>
+          <button
+            type="button"
             onClick={onClose}
             className="min-h-11 px-4 rounded-[var(--radius-card)] border border-black/10 bg-white text-sm font-medium cursor-pointer"
           >
@@ -98,6 +126,15 @@ export function ApplicationEditor({
           </button>
         </div>
       </div>
+
+      {(message || error) && (
+        <p
+          className="mt-0 mb-2 text-sm print:hidden"
+          style={{ color: error ? 'var(--color-faults)' : 'var(--color-ideas)' }}
+        >
+          {error ?? message}
+        </p>
+      )}
 
       <p className="mt-0 mb-2 text-sm text-[var(--color-text)]/70 print:hidden">
         {copy.documentDisclaimer}
@@ -157,6 +194,37 @@ export function ApplicationEditor({
             />
           </label>
         ))}
+
+        {projectType === 'non_investment' && (
+          <>
+            <label className="mt-3 flex flex-col gap-1 text-sm">
+              Uczestnicy / odbiorcy
+              <textarea
+                rows={2}
+                value={content.participants ?? ''}
+                disabled={!isAuthor}
+                onChange={(e) => patch('participants', e.target.value)}
+                className="px-3 py-2 rounded-[var(--radius-card)] border border-black/10 resize-y"
+              />
+            </label>
+            <label className="mt-3 flex flex-col gap-1 text-sm">
+              Materiały i sprzęt (bez inwestycji budowlanej)
+              <textarea
+                rows={2}
+                value={content.equipment ?? ''}
+                disabled={!isAuthor}
+                onChange={(e) => patch('equipment', e.target.value)}
+                className="px-3 py-2 rounded-[var(--radius-card)] border border-black/10 resize-y"
+              />
+            </label>
+          </>
+        )}
+
+        <p className="mt-3 mb-0 text-xs text-[var(--color-text)]/55">
+          Wariant szablonu:{' '}
+          {projectType === 'non_investment' ? 'nieinwestycyjny' : 'inwestycyjny'} · v
+          {template.version}
+        </p>
 
         <h3 className="mt-4 mb-2 text-sm font-semibold">Harmonogram</h3>
         <ul className="m-0 pl-5 text-sm">

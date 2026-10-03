@@ -50,6 +50,11 @@ export type ApplicationTemplate = {
   supportSignaturesRequired: number
   supportListDaysAfterSubmission: number
   notes: string[]
+  /** Extra fields by BO project character (instrukcja formularza 2026). */
+  variantFields: {
+    investment: TemplateField[]
+    non_investment: TemplateField[]
+  }
 }
 
 export type CostCatalogItem = {
@@ -100,7 +105,7 @@ export interface CityAdapter {
   rulesVersion: string
 
   checkLocation(point: GeoPoint): Promise<LandAssessment>
-  getApplicationTemplate(): ApplicationTemplate
+  getApplicationTemplate(projectType?: 'investment' | 'non_investment'): ApplicationTemplate
   getCostCatalog(): CostCatalog
   getSubmissionInstructions(): SubmissionInstructions
   getCalendar(): CityCalendar

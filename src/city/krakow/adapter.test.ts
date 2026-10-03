@@ -63,6 +63,17 @@ describe('KrakowCityAdapter', () => {
     expect(template.supportListDaysAfterSubmission).toBe(10)
   })
 
+  it('merges investment vs non-investment template variants', () => {
+    const investment = adapter.getApplicationTemplate('investment')
+    const nonInvestment = adapter.getApplicationTemplate('non_investment')
+
+    expect(investment.fields.some((f) => f.id === 'costEstimate')).toBe(true)
+    expect(investment.fields.some((f) => f.id === 'schedule')).toBe(true)
+    expect(nonInvestment.fields.some((f) => f.id === 'participants')).toBe(true)
+    expect(nonInvestment.fields.some((f) => f.id === 'equipment')).toBe(true)
+    expect(nonInvestment.fields.some((f) => f.id === 'costEstimate')).toBe(false)
+  })
+
   it('exposes cost catalog ranges for known Kraków items', () => {
     const catalog = adapter.getCostCatalog()
     const bench = catalog.items.find((i) => i.id === 'bench_backrest_installation')

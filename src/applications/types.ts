@@ -11,6 +11,10 @@ export type ApplicationContent = {
   warnings: string[]
   usedCommentIds: string[]
   generator: 'mock' | 'openai'
+  projectType?: 'investment' | 'non_investment'
+  /** Non-investment variant fields (instrukcja formularza). */
+  participants?: string
+  equipment?: string
 }
 
 export type ApplicationRecord = {

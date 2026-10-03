@@ -21,6 +21,12 @@ import type { FaultRecord } from './faults/types'
 import { CreateIdeaForm } from './ideas/CreateIdeaForm'
 import { IdeaDetailCard } from './ideas/IdeaDetailCard'
 import { fetchPublishedIdeas } from './ideas/api'
+import {
+  emptyIdeaFilters,
+  filterIdeas,
+  uniqueDistricts,
+  type IdeaListFilters,
+} from './ideas/filters'
 import { fetchMyLikedIdeaIds, setLike } from './ideas/likes'
 import type { IdeaRecord } from './ideas/types'
 import { useOnline } from './lib/online'
@@ -55,6 +61,7 @@ function App() {
   const [layer, setLayer] = useState<MapLayer>('pomysly')
   const [mode, setMode] = useState<MapMode>('mapa')
   const [filterByAreas, setFilterByAreas] = useState(false)
+  const [ideaFilters, setIdeaFilters] = useState<IdeaListFilters>(emptyIdeaFilters)
   const [land, setLand] = useState<LandAssessment | null>(null)
   const [landLoading, setLandLoading] = useState(false)
   const [landError, setLandError] = useState<string | null>(null)
@@ -101,9 +108,12 @@ function App() {
   }, [likesQuery.data])
 
   const filteredIdeas = useMemo(() => {
-    if (!filterByAreas || areas.length === 0) return ideas
-    return ideas.filter((idea) => ideaMatchesAreas(idea, areas))
-  }, [ideas, areas, filterByAreas])
+    let list = filterIdeas(ideas, ideaFilters)
+    if (filterByAreas && areas.length > 0) {
+      list = list.filter((idea) => ideaMatchesAreas(idea, areas))
+    }
+    return list
+  }, [ideas, areas, filterByAreas, ideaFilters])
 
   async function handleMapClick(point: { lat: number; lng: number }) {
     setSelectedIdeaId(null)
@@ -220,12 +230,15 @@ function App() {
             faults={faultsFromDb ? faults : null}
             areas={areas}
             filterByAreas={filterByAreas}
+            ideaFilters={ideaFilters}
+            districtOptions={uniqueDistricts(ideas)}
             ideasSource={ideasFromDb ? 'db' : 'demo'}
             faultsSource={faultsFromDb ? 'db' : 'demo'}
             selectedIdea={selectedIdea}
             likedIds={likedIds}
             userId={user?.id ?? null}
             onFilterByAreasChange={setFilterByAreas}
+            onIdeaFiltersChange={setIdeaFilters}
             onLayerChange={setLayer}
             onModeChange={setMode}
             onAdd={() => {
@@ -384,12 +397,15 @@ type MapScreenProps = {
   faults: FaultRecord[] | null
   areas: { id: string; lat: number | null; lng: number | null; radius_m: number | null; kind: string }[]
   filterByAreas: boolean
+  ideaFilters: IdeaListFilters
+  districtOptions: string[]
   ideasSource: 'db' | 'demo'
   faultsSource: 'db' | 'demo'
   selectedIdea: IdeaRecord | null
   likedIds: Set<string>
   userId: string | null
   onFilterByAreasChange: (v: boolean) => void
+  onIdeaFiltersChange: (f: IdeaListFilters) => void
   onLayerChange: (layer: MapLayer) => void
   onModeChange: (mode: MapMode) => void
   onAdd: () => void
@@ -418,12 +434,15 @@ function MapScreen({
   faults,
   areas,
   filterByAreas,
+  ideaFilters,
+  districtOptions,
   ideasSource,
   faultsSource,
   selectedIdea,
   likedIds,
   userId,
   onFilterByAreasChange,
+  onIdeaFiltersChange,
   onLayerChange,
   onModeChange,
   onAdd,
@@ -535,6 +554,61 @@ function MapScreen({
           />
           Filtr: moje okolice
         </label>
+
+        {layer === 'pomysly' && (
+          <div
+            className="flex flex-wrap items-center gap-1 text-xs"
+            role="group"
+            aria-label="Filtry listy pomysłów"
+          >
+            <select
+              value={ideaFilters.district}
+              onChange={(e) =>
+                onIdeaFiltersChange({ ...ideaFilters, district: e.target.value })
+              }
+              className="min-h-9 px-2 rounded-[var(--radius-card)] border border-black/10 bg-white"
+              aria-label="Dzielnica"
+            >
+              <option value="">Dzielnica: wszystkie</option>
+              {districtOptions.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+            <select
+              value={ideaFilters.category}
+              onChange={(e) =>
+                onIdeaFiltersChange({
+                  ...ideaFilters,
+                  category: e.target.value as IdeaListFilters['category'],
+                })
+              }
+              className="min-h-9 px-2 rounded-[var(--radius-card)] border border-black/10 bg-white"
+              aria-label="Kategoria"
+            >
+              <option value="">Kategoria: wszystkie</option>
+              <option value="investment">Inwestycyjne</option>
+              <option value="non_investment">Nieinwestycyjne</option>
+            </select>
+            <label className="inline-flex items-center gap-1 text-[var(--color-text)]/70">
+              Min. lajki
+              <input
+                type="number"
+                min={0}
+                max={50}
+                value={ideaFilters.minLikes}
+                onChange={(e) =>
+                  onIdeaFiltersChange({
+                    ...ideaFilters,
+                    minLikes: Number(e.target.value) || 0,
+                  })
+                }
+                className="w-14 min-h-9 px-2 rounded-[var(--radius-card)] border border-black/10 bg-white"
+              />
+            </label>
+          </div>
+        )}
 
         <div
           className="inline-flex rounded-[var(--radius-card)] bg-[var(--color-bg)] p-1 ml-auto"

@@ -10,7 +10,8 @@ export type ContentValidation = {
 export function validateApplicationContent(
   content: ApplicationContent,
 ): ContentValidation {
-  const template = krakowAdapter.getApplicationTemplate()
+  const projectType = content.projectType ?? 'investment'
+  const template = krakowAdapter.getApplicationTemplate(projectType)
   const errors: string[] = []
   const warnings: string[] = [...content.warnings]
 
@@ -33,7 +34,14 @@ export function validateApplicationContent(
     if (!content[id]?.trim()) errors.push(`Pole „${id}” jest wymagane.`)
   }
 
-  if (content.costItems.length === 0) {
+  if (projectType === 'non_investment') {
+    const participantsRequired = template.fields.find((f) => f.id === 'participants')
+    if (participantsRequired?.required && !content.participants?.trim()) {
+      errors.push('Pole „Uczestnicy / odbiorcy” jest wymagane dla projektu nieinwestycyjnego.')
+    }
+  }
+
+  if (projectType === 'investment' && content.costItems.length === 0) {
     warnings.push('Brak pozycji kosztorysu z katalogu.')
   }
 

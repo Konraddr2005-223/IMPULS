@@ -34,5 +34,18 @@ describe('mockGenerateApplication', () => {
     expect(doc.title).toContain('Zielony')
     expect(doc.costItems).toHaveLength(2)
     expect(doc.warnings.some((w) => w.toLowerCase().includes('mock'))).toBe(true)
+    expect(doc.projectType).toBe('investment')
+  })
+
+  it('uses non-investment variant fields', () => {
+    const doc = mockGenerateApplication({
+      idea: { ...idea, category: 'non_investment', title: 'Warsztaty naprawcze' },
+      selectedComments: [],
+      costItems: [],
+    })
+    expect(doc.projectType).toBe('non_investment')
+    expect(doc.participants).toBeTruthy()
+    expect(doc.equipment).toBeTruthy()
+    expect(doc.warnings.some((w) => w.includes('nieinwestycyjny'))).toBe(true)
   })
 })
