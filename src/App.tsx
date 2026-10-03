@@ -16,6 +16,7 @@ import type { LandAssessment } from './city/types'
 import type { CommentRecord } from './comments/api'
 import { DEMO_DISCLAIMER, demoFaults, demoIdeas } from './data/demoContent'
 import { CreateFaultForm } from './faults/CreateFaultForm'
+import { FaultDetailCard } from './faults/FaultDetailCard'
 import { FAULT_STATUS_LABELS, fetchFaults } from './faults/api'
 import type { FaultRecord } from './faults/types'
 import { CreateIdeaForm } from './ideas/CreateIdeaForm'
@@ -69,6 +70,7 @@ function App() {
     null,
   )
   const [selectedIdeaId, setSelectedIdeaId] = useState<string | null>(null)
+  const [selectedFaultId, setSelectedFaultId] = useState<string | null>(null)
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set())
   const [application, setApplication] = useState<ApplicationRecord | null>(null)
   const [prepareOpen, setPrepareOpen] = useState(false)
@@ -117,6 +119,7 @@ function App() {
 
   async function handleMapClick(point: { lat: number; lng: number }) {
     setSelectedIdeaId(null)
+    setSelectedFaultId(null)
     setDraftPoint(point)
     setLandLoading(true)
     setLandError(null)
@@ -180,6 +183,8 @@ function App() {
 
   const selectedIdea =
     filteredIdeas.find((idea) => idea.id === selectedIdeaId) ?? null
+  const selectedFault =
+    faults.find((fault) => fault.id === selectedFaultId) ?? null
 
   if (application) {
     return (
@@ -235,11 +240,16 @@ function App() {
             ideasSource={ideasFromDb ? 'db' : 'demo'}
             faultsSource={faultsFromDb ? 'db' : 'demo'}
             selectedIdea={selectedIdea}
+            selectedFault={selectedFault}
             likedIds={likedIds}
             userId={user?.id ?? null}
             onFilterByAreasChange={setFilterByAreas}
             onIdeaFiltersChange={setIdeaFilters}
-            onLayerChange={setLayer}
+            onLayerChange={(next) => {
+              setLayer(next)
+              setSelectedIdeaId(null)
+              setSelectedFaultId(null)
+            }}
             onModeChange={setMode}
             onAdd={() => {
               setAddKind(layer === 'usterki' ? 'fault' : 'idea')
@@ -248,10 +258,21 @@ function App() {
             onMapClick={handleMapClick}
             onSelectIdea={(id) => {
               setSelectedIdeaId(id)
+              setSelectedFaultId(null)
+              setLand(null)
+              setLandError(null)
+            }}
+            onSelectFault={(id) => {
+              setSelectedFaultId(id)
+              setSelectedIdeaId(null)
               setLand(null)
               setLandError(null)
             }}
             onCloseIdea={() => setSelectedIdeaId(null)}
+            onCloseFault={() => setSelectedFaultId(null)}
+            onFaultUpdated={() => {
+              void qc.invalidateQueries({ queryKey: ['faults'] })
+            }}
             onLikeToggle={handleLikeToggle}
             onCloseLand={() => {
               setLand(null)
@@ -402,6 +423,7 @@ type MapScreenProps = {
   ideasSource: 'db' | 'demo'
   faultsSource: 'db' | 'demo'
   selectedIdea: IdeaRecord | null
+  selectedFault: FaultRecord | null
   likedIds: Set<string>
   userId: string | null
   onFilterByAreasChange: (v: boolean) => void
@@ -411,7 +433,10 @@ type MapScreenProps = {
   onAdd: () => void
   onMapClick: (point: { lat: number; lng: number }) => void
   onSelectIdea: (id: string) => void
+  onSelectFault: (id: string) => void
   onCloseIdea: () => void
+  onCloseFault: () => void
+  onFaultUpdated: () => void
   onLikeToggle: (ideaId: string, liked: boolean) => Promise<void>
   onCloseLand: () => void
   onCheckLandForIdea: (idea: IdeaRecord) => void
@@ -439,6 +464,7 @@ function MapScreen({
   ideasSource,
   faultsSource,
   selectedIdea,
+  selectedFault,
   likedIds,
   userId,
   onFilterByAreasChange,
@@ -448,7 +474,10 @@ function MapScreen({
   onAdd,
   onMapClick,
   onSelectIdea,
+  onSelectFault,
   onCloseIdea,
+  onCloseFault,
+  onFaultUpdated,
   onLikeToggle,
   onCloseLand,
   onCheckLandForIdea,
@@ -686,20 +715,40 @@ function MapScreen({
             </ul>
           ) : (
             <ul className="m-0 p-0 list-none">
-              {faults
-                ? faults.map((fault) => (
-                    <li key={fault.id} className="border-b border-black/5 px-4 py-3">
-                      <p className="m-0 font-medium">{fault.description}</p>
-                      <p className="m-0 mt-1 text-sm text-[var(--color-text)]/65">
-                        {FAULT_STATUS_LABELS[fault.status] ?? fault.status}
-                      </p>
+              {faults ? (
+                faults.length === 0 ? (
+                  <li className="px-4 py-3 text-sm text-[var(--color-text)]/60">
+                    Brak usterek w tym widoku. Dodaj zgłoszenie z mapy.
+                  </li>
+                ) : (
+                  faults.map((fault) => (
+                    <li key={fault.id} className="border-b border-black/5">
+                      <button
+                        type="button"
+                        onClick={() => onSelectFault(fault.id)}
+                        className="w-full text-left px-4 py-3 border-0 bg-transparent cursor-pointer"
+                        style={{
+                          background:
+                            selectedFault?.id === fault.id
+                              ? 'color-mix(in srgb, var(--color-faults) 8%, white)'
+                              : 'transparent',
+                        }}
+                      >
+                        <p className="m-0 font-medium">{fault.description}</p>
+                        <p className="m-0 mt-1 text-sm text-[var(--color-text)]/65">
+                          ● {FAULT_STATUS_LABELS[fault.status] ?? fault.status}
+                        </p>
+                      </button>
                     </li>
                   ))
-                : demoFaults.map((fault) => (
-                    <li key={fault.id} className="border-b border-black/5 px-4 py-3">
-                      <p className="m-0 font-medium">{fault.title}</p>
-                    </li>
-                  ))}
+                )
+              ) : (
+                demoFaults.map((fault) => (
+                  <li key={fault.id} className="border-b border-black/5 px-4 py-3">
+                    <p className="m-0 font-medium">{fault.title}</p>
+                  </li>
+                ))
+              )}
             </ul>
           )}
         </aside>
@@ -716,6 +765,10 @@ function MapScreen({
             onMarkerClick={(marker) => {
               if (marker.kind === 'idea' && ideas) {
                 onSelectIdea(marker.id)
+                return
+              }
+              if (marker.kind === 'fault' && faults) {
+                onSelectFault(marker.id)
                 return
               }
               onMapClick({ lat: marker.lat, lng: marker.lng })
@@ -737,6 +790,13 @@ function MapScreen({
                 </p>
               )}
             </>
+          ) : selectedFault && !land && !landLoading ? (
+            <FaultDetailCard
+              fault={selectedFault}
+              userId={userId}
+              onClose={onCloseFault}
+              onUpdated={() => onFaultUpdated()}
+            />
           ) : selectedIdea && !land && !landLoading ? (
             <IdeaDetailCard
               idea={selectedIdea}

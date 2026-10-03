@@ -1,19 +1,25 @@
 # Nagranie zapasowe dema
 
-## Checklist
+## Checklist (nagraj ekran ~3–4 min)
 
 1. Zaloguj **Autor** i **Sąsiad** (Confirm email OFF).
-2. Uruchom `reset_demo.sql` + `demo_scenario.sql`.
-3. Telefon / desktop: mapa z „Zielony zakątek” (2/3).
-4. Sąsiad: trzeci lajk (lub drugi konta) → próg.
-5. Autor: komentarze → Przygotuj wniosek → ilości → dokument → druk.
-6. Usterka DEMO na mapie.
+2. SQL: `reset_demo.sql` (opcjonalnie) → `demo_fake_profiles.sql` → `demo_scenario.sql`.
+3. Telefon / desktop HTTPS: mapa z „Zielony zakątek” (**2/3**).
+4. Sąsiad: trzeci lajk → próg odblokowany.
+5. Autor: komentarze → Przygotuj wniosek → ilości katalogu → dokument → Kopiuj / Drukuj.
+6. Warstwa Usterki → status + historia (opcjonalnie symulacja miasta).
 7. Powiadomienia u sąsiada po „Opublikuj streszczenie”.
+8. Awaria AI: w edytorze „Przykład awaryjny”.
 
 ## Plik
 
-Zapisz nagranie poza repo (np. Drive) jako `sasiedzki-backup-demo.mp4` i wklej link poniżej:
+Zapisz nagranie **poza repo** (Drive / OneDrive) jako `sasiedzki-backup-demo.mp4`:
 
-- Link: _TODO_
-- Data: _TODO_
-- Osoba nagrywająca: _TODO_
+| Pole | Wartość |
+|---|---|
+| Link | _TODO_po_nagraniu_ |
+| Data | _TODO_ |
+| Osoba | _TODO_ |
+| Publiczny URL app | _TODO_pages_ |
+
+Prezentacja PDF: otwórz `docs/presentation.html` → Drukuj → Zapisz jako PDF.

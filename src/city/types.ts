@@ -3,7 +3,12 @@ export type GeoPoint = {
   lng: number
 }
 
-export type SourceMode = 'live' | 'verified_snapshot' | 'synthetic_demo' | 'unavailable'
+export type SourceMode =
+  | 'live'
+  | 'verified_snapshot'
+  | 'synthetic_demo'
+  | 'unavailable'
+  | 'cache'
 
 export type OwnershipClass =
   | 'municipal'

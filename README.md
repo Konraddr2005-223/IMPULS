@@ -9,18 +9,22 @@ Responsywna PWA pomagająca mieszkańcom Krakowa rozwijać pomysły okolicy: map
 - React + TypeScript + Vite + Tailwind
 - Leaflet / React Leaflet
 - TanStack Query, React Hook Form, Zod, Lucide
-- Supabase (Auth, Postgres/PostGIS, Storage, Edge Functions stub)
-- Generator wniosku: mock lokalny (domyślnie) lub Edge Function + OpenAI gdy skonfigurowane
+- Supabase (Auth, Postgres/PostGIS, Storage, Edge Functions)
+- Generator wniosku: **mock lokalny** domyślnie; Edge + OpenAI po ustawieniu `OPENAI_API_KEY`
 - PWA (vite-plugin-pwa)
 
-## Role w repo
+## Status brancha `feat/roles-b-c`
 
-| Branch | Zakres |
+| Obszar | Stan |
 |---|---|
-| `main` / praca A | Frontend, mapa, UX |
-| `feat/roles-b-c` | Backend/dane (B) + AI/prezentacja (C) |
-
-Merge B+C → A na końcu hackathonu.
+| Schema, RLS, lajki, usterki + historia statusu, obszary, powiadomienia | Gotowe w kodzie |
+| Seed §7 (~20 profili, lajki z rekordów, komentarze) | SQL gotowy — wkleić w Dashboard |
+| Adapter Kraków, 12 lokalizacji demo, cennik, filtry listy | Gotowe |
+| Mock generator, edytor, kopiuj/druk, przykład awaryjny, warianty BO | Gotowe |
+| Edge `generate-application` | Gotowe na klucz (bez klucza → mock) |
+| Prezentacja HTML→PDF, QR helper, deploy docs | `docs/presentation.html`, `public/qr.html`, `docs/deploy.md` |
+| Cloudflare Pages URL + nagranie zapasowe | Do uzupełnienia po deployu / nagraniu |
+| Osoba A (dopieszczenie UI) / merge | Osobno |
 
 ## Rozwój
 
@@ -34,6 +38,11 @@ npm run build
 
 App lokalnie: http://127.0.0.1:5173/
 
+### Auth (Dashboard)
+
+- Email provider ON
+- **Confirm email OFF** na demo (włączyć przed publicznym pilotażem)
+
 ### Konta demo
 
 | Rola | E-mail | Hasło |
@@ -41,23 +50,32 @@ App lokalnie: http://127.0.0.1:5173/
 | Autor | autor@example.com | SasiedzkiDemo2026! |
 | Sąsiad | sasiad@example.com | SasiedzkiDemo2026! |
 
-### Seed / reset (Supabase SQL Editor)
+Utwórz konta **przed** seedem scenariusza.
 
-1. `supabase/seed/reset_demo.sql` (opcjonalnie)
-2. `supabase/seed/demo_fake_profiles.sql` (~18 profili do lajków)
-3. `supabase/seed/demo_scenario.sql` (pomysły, lajki z rekordów, komentarze)
-4. `supabase/migrations/PASTE_ME_spatial_likers.sql` (RPC filtrów i likerów)
-5. Wcześniejsze: schema, lat/lng, storage — patrz `supabase/migrations/`
+### SQL (kolejność w Supabase SQL Editor)
 
-Szczegóły: `supabase/seed/demo_accounts.md`.
+1. `supabase/migrations/20261003180000_init_schema.sql`
+2. `supabase/migrations/20261003183000_ideas_lat_lng.sql`
+3. `supabase/migrations/PASTE_ME_storage_notifications.sql`
+4. `supabase/migrations/PASTE_ME_spatial_likers.sql`
+5. `supabase/migrations/PASTE_ME_fault_history_land_cache.sql`
+6. `supabase/seed/demo_fake_profiles.sql`
+7. `supabase/seed/demo_scenario.sql`
+
+Szczegóły: `supabase/seed/demo_accounts.md`, `docs/deploy.md`.
+
+## Hosting i QR
+
+Zobacz `docs/deploy.md`. Po HTTPS URL: otwórz `/qr.html`, wklej adres, wygeneruj QR dla jury.
 
 ## Ujawnienie AI
 
-Aplikacja może przygotować **roboczą** treść projektu BO. W trybie domyślnym używany jest **deterministyczny generator mock** (bez wywołania OpenAI) — oznaczony w dokumencie (`generator: mock`). Gdy wdrożona jest Edge Function `generate-application` z sekretem `OPENAI_API_KEY`, treść redaguje model `gpt-4.1-mini` według promptu systemowego ze specyfikacji; **ceny i sumy pochodzą wyłącznie z katalogu miejskiego** (nie z modelu). Lajki nie są podpisami ani głosami. Oficjalne złożenie projektu odbywa się w systemie miasta.
+Aplikacja przygotowuje **roboczą** treść projektu BO. Domyślnie: deterministyczny **mock** (`generator: mock`). Po `supabase secrets set OPENAI_API_KEY=…` i deployu Edge Function treść redaguje `gpt-4.1-mini`; **ceny wyłącznie z katalogu miejskiego**. Lajki ≠ podpisy BO. Złożenie oficjalne — w systemie miasta.
 
 ## Dokumenty prezentacji
 
-- `docs/presentation.md` — 10 slajdów
+- `docs/presentation.html` — 10 slajdów → Drukuj → PDF
+- `docs/presentation.md` — skrót narracji
 - `docs/backup-demo.md` — checklista nagrania zapasowego
 - `specification of smartcity project.md` — pełny plan
 
@@ -66,6 +84,9 @@ Aplikacja może przygotować **roboczą** treść projektu BO. W trybie domyśln
 ```
 PWA → Supabase Auth / Data / Storage
     → CityAdapter (Kraków): szablon, cennik, demo land, WMS probe
-    → generate-application (Edge lub mock)
-    → land_checks cache ≤24h
+    → generate-application (Edge+OpenAI lub mock)
+    → land_checks cache ≤24h (tylko live)
+    → fault_status_events (historia)
 ```
+
+Map tiles: © OpenStreetMap contributors.

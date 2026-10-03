@@ -69,6 +69,20 @@ export function LandCard({ assessment, loading, error, onClose }: LandCardProps)
           {assessment.scenarioDescription && (
             <p className="m-0 text-[var(--color-text)]/75">{assessment.scenarioDescription}</p>
           )}
+          {assessment.assessment === 'requires_review' && (
+            <p className="m-0 text-xs text-[var(--color-text)]/60">
+              Punkt może leżeć przy granicy działki — wynik wymaga weryfikacji.
+            </p>
+          )}
+          <p className="m-0 text-xs text-[var(--color-text)]/55">
+            Pobrano: {new Date(assessment.retrievedAt).toLocaleString('pl-PL')}
+            {assessment.ownershipUpdatedAt
+              ? ` · własność: ${assessment.ownershipUpdatedAt}`
+              : ''}
+            {assessment.planningUpdatedAt
+              ? ` · plan: ${assessment.planningUpdatedAt}`
+              : ''}
+          </p>
           <ul className="m-0 pl-4">
             {assessment.warnings.map((warning) => (
               <li key={warning}>{warning}</li>

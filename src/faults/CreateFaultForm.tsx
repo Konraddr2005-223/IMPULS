@@ -1,11 +1,16 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Camera, LocateFixed } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useAuth } from '../auth/AuthContext'
 import { demoAccounts } from '../auth/demoAccounts'
 import { createFaultSchema, type CreateFaultFormValues } from '../ideas/schemas'
 import { getCurrentPosition } from '../lib/geolocation'
+import {
+  clearOfflineDraft,
+  loadOfflineDraft,
+  saveOfflineDraft,
+} from '../lib/offlineDraft'
 import { useOnline } from '../lib/online'
 import { uploadPhoto } from '../lib/storage'
 import { copy } from '../ui/copy'

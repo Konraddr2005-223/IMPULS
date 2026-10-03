@@ -46,19 +46,26 @@ export async function readLandCache(
   return null
 }
 
+/** Persist only live (or verified) assessments — not pure demo/unavailable misses. */
 export async function writeLandCache(
   point: GeoPoint,
   assessment: LandAssessment,
   ideaId?: string | null,
 ): Promise<void> {
   if (!supabase) return
-  await supabase.from('land_checks').insert({
+  if (assessment.mode !== 'live' && assessment.mode !== 'verified_snapshot') {
+    return
+  }
+  const { error } = await supabase.from('land_checks').insert({
     idea_id: ideaId ?? null,
     location: `SRID=4326;POINT(${point.lng} ${point.lat})`,
     source_mode: assessment.mode,
     ownership_json: {
       class: assessment.ownershipClass,
       raw: assessment.ownershipRawLabel,
+      parcelId: assessment.parcelId,
+      warnings: assessment.warnings,
+      scenarioDescription: assessment.scenarioDescription,
     },
     planning_json: assessment.planning,
     assessment: assessment.assessment,
@@ -66,6 +73,10 @@ export async function writeLandCache(
     planning_updated_at: assessment.planningUpdatedAt,
     retrieved_at: assessment.retrievedAt,
   })
+  if (error) {
+    // RLS / network — ignore; form must still work
+    console.warn('land_checks cache write failed', error.message)
+  }
 }
 
 function parsePoint(location: unknown): GeoPoint | null {
@@ -83,9 +94,12 @@ function parsePoint(location: unknown): GeoPoint | null {
 function rowToAssessment(row: LandCheckRow): LandAssessment {
   const ownership = row.ownership_json ?? {}
   const planning = (row.planning_json ?? {}) as LandAssessment['planning']
+  const cachedWarnings = Array.isArray(ownership.warnings)
+    ? (ownership.warnings as string[])
+    : []
   return {
-    mode: row.source_mode as LandAssessment['mode'],
-    parcelId: null,
+    mode: 'cache',
+    parcelId: (ownership.parcelId as string | null) ?? null,
     ownershipClass: (ownership.class as LandAssessment['ownershipClass']) ?? 'unknown',
     ownershipRawLabel: (ownership.raw as string | null) ?? null,
     planning: {
@@ -97,10 +111,13 @@ function rowToAssessment(row: LandCheckRow): LandAssessment {
     warnings: [
       'Wynik z lokalnego cache land_checks (≤24 h).',
       'Informacja poglądowa. Ostateczną możliwość realizacji ocenia miasto.',
+      ...cachedWarnings,
     ],
     retrievedAt: row.retrieved_at,
     ownershipUpdatedAt: row.ownership_updated_at,
     planningUpdatedAt: row.planning_updated_at,
-    scenarioDescription: 'Cache odczytu terenu.',
+    scenarioDescription:
+      (ownership.scenarioDescription as string | undefined) ??
+      'Cache odczytu terenu.',
   }
 }

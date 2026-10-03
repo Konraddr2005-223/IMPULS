@@ -1,11 +1,12 @@
 import { krakowAdapter } from '../city'
 import type { IdeaRecord } from '../ideas/types'
 import { supabase } from '../lib/supabase'
+import { assertCanGenerate } from './gates'
+import { MAX_GENERATIONS_PER_IDEA, MAX_SELECTED_COMMENTS } from './limits'
 import { hashInput, mockGenerateApplication } from './mockGenerate'
 import type { ApplicationContent, ApplicationRecord } from './types'
 
-export const MAX_GENERATIONS_PER_IDEA = 3
-export const MAX_SELECTED_COMMENTS = 20
+export { MAX_GENERATIONS_PER_IDEA, MAX_SELECTED_COMMENTS }
 
 export async function countGenerations(ideaId: string): Promise<number> {
   if (!supabase) return 0
@@ -56,13 +57,19 @@ export async function saveApplicationContent(
   return data as ApplicationRecord
 }
 
+type EdgeResult =
+  | { kind: 'application'; application: ApplicationRecord }
+  | { kind: 'mock' }
+  | { kind: 'error'; message: string }
+  | { kind: 'skip' }
+
 async function tryEdgeGenerate(input: {
   idea: IdeaRecord
   selectedComments: { id: string; body: string }[]
   costItems: { catalogId: string; quantity: number }[]
   landNote?: string
-}): Promise<ApplicationRecord | null> {
-  if (!supabase) return null
+}): Promise<EdgeResult> {
+  if (!supabase) return { kind: 'skip' }
   try {
     const { data, error } = await supabase.functions.invoke('generate-application', {
       body: {
@@ -72,11 +79,23 @@ async function tryEdgeGenerate(input: {
         landNote: input.landNote,
       },
     })
-    if (error) return null
-    if (data?.application) return data.application as ApplicationRecord
-    return null
+    if (error) return { kind: 'skip' }
+    if (data?.application) {
+      return { kind: 'application', application: data.application as ApplicationRecord }
+    }
+    if (data?.mode === 'mock') return { kind: 'mock' }
+    if (data?.mode === 'openai-error' || data?.error) {
+      return {
+        kind: 'error',
+        message:
+          typeof data?.detail === 'string'
+            ? data.detail
+            : 'Generator AI niedostępny — użyto mocka / przykładu awaryjnego.',
+      }
+    }
+    return { kind: 'skip' }
   } catch {
-    return null
+    return { kind: 'skip' }
   }
 }
 
@@ -88,22 +107,14 @@ export async function generateAndSaveApplication(input: {
   landNote?: string
 }): Promise<ApplicationRecord> {
   if (!supabase) throw new Error('Supabase nie jest skonfigurowany.')
-  if (input.idea.author_id !== input.authorId) {
-    throw new Error('Tylko autor pomysłu może generować wniosek.')
-  }
-  if (input.idea.likes_count < input.idea.support_threshold) {
-    throw new Error(
-      `Wymagane poparcie: ${input.idea.support_threshold}. Obecnie: ${input.idea.likes_count}.`,
-    )
-  }
-  if (input.selectedComments.length > MAX_SELECTED_COMMENTS) {
-    throw new Error(`Maks. ${MAX_SELECTED_COMMENTS} komentarzy we wniosku.`)
-  }
 
   const previous = await countGenerations(input.idea.id)
-  if (previous >= MAX_GENERATIONS_PER_IDEA) {
-    throw new Error(`Limit ${MAX_GENERATIONS_PER_IDEA} generowań na pomysł w demo.`)
-  }
+  assertCanGenerate({
+    idea: input.idea,
+    authorId: input.authorId,
+    selectedCommentCount: input.selectedComments.length,
+    previousGenerations: previous,
+  })
 
   const { data: inflight } = await supabase
     .from('applications')
@@ -115,8 +126,9 @@ export async function generateAndSaveApplication(input: {
     throw new Error('Trwa już generowanie dla tego pomysłu — odczekaj.')
   }
 
-  const fromEdge = await tryEdgeGenerate(input)
-  if (fromEdge) return fromEdge
+  const edge = await tryEdgeGenerate(input)
+  if (edge.kind === 'application') return edge.application
+  // mock / skip / openai-error → local mock (emergency example available in editor)
 
   const content: ApplicationContent = mockGenerateApplication({
     idea: input.idea,
@@ -124,6 +136,13 @@ export async function generateAndSaveApplication(input: {
     costItems: input.costItems,
     landNote: input.landNote,
   })
+  if (edge.kind === 'error') {
+    content.warnings = [
+      ...content.warnings,
+      `Uwaga: ${edge.message}`,
+      'Możesz wczytać „Przykład awaryjny” w edytorze.',
+    ]
+  }
 
   const inputHash = hashInput({
     ideaId: input.idea.id,

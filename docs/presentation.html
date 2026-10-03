@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sąsiedzki — prezentacja (10 slajdów)</title>
+    <style>
+      :root {
+        --ideas: #176b4b;
+        --action: #2457d6;
+        --bg: #f7f8fa;
+        --text: #17212b;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Georgia, 'Times New Roman', serif;
+        background: #ddd;
+        color: var(--text);
+      }
+      .toolbar {
+        position: sticky; top: 0; z-index: 2;
+        display: flex; gap: 0.5rem; flex-wrap: wrap;
+        padding: 0.75rem 1rem;
+        background: #fff; border-bottom: 1px solid #ccc;
+        font-family: system-ui, sans-serif;
+      }
+      .toolbar button {
+        min-height: 40px; padding: 0 1rem; border: 0; border-radius: 8px;
+        background: var(--action); color: #fff; cursor: pointer; font-weight: 600;
+      }
+      .slide {
+        width: min(960px, 92vw);
+        min-height: 540px;
+        margin: 1.25rem auto;
+        padding: 2.5rem 3rem;
+        background: linear-gradient(160deg, #fff 0%, var(--bg) 100%);
+        border-radius: 4px;
+        box-shadow: 0 8px 28px rgba(0,0,0,.12);
+        page-break-after: always;
+        break-after: page;
+      }
+      .brand { color: var(--ideas); font-size: 1.1rem; font-weight: 700; margin: 0 0 1rem; font-family: system-ui, sans-serif; }
+      h1 { margin: 0 0 1rem; font-size: 2.2rem; line-height: 1.2; }
+      h2 { margin: 0 0 0.75rem; font-size: 1.7rem; }
+      p, li { font-size: 1.15rem; line-height: 1.45; }
+      .tag { font-family: system-ui, sans-serif; font-size: 0.85rem; color: #555; }
+      table { width: 100%; border-collapse: collapse; font-family: system-ui, sans-serif; font-size: 0.95rem; }
+      td, th { border-bottom: 1px solid #ddd; padding: 0.45rem 0.3rem; text-align: left; }
+      @media print {
+        body { background: #fff; }
+        .toolbar { display: none; }
+        .slide { box-shadow: none; margin: 0; width: 100%; min-height: 100vh; border-radius: 0; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="toolbar">
+      <strong>Sąsiedzki — 10 slajdów</strong>
+      <button type="button" onclick="window.print()">Drukuj / Zapisz PDF</button>
+      <span class="tag">Otwórz w przeglądarce → Drukuj → Zapisz jako PDF</span>
+    </div>
+
+    <section class="slide">
+      <p class="brand">Sąsiedzki</p>
+      <h1>Od pomysłu do formularza BO jest daleko</h1>
+      <p>Teren, treść, pierwsze poparcie sąsiadów — zanim oficjalny wniosek.</p>
+      <p class="tag">Pomysł z okolicy. Wspólne działanie.</p>
+    </section>
+
+    <section class="slide">
+      <p class="brand">Sąsiedzki</p>
+      <h2>Hipoteza</h2>
+      <p>Sąsiedzi chcą najpierw sprawdzić teren i zebrać sygnał zainteresowania, zanim wypełnią oficjalny formularz miasta.</p>
+    </section>
+
+    <section class="slide">
+      <p class="brand">Sąsiedzki</p>
+      <h2>Rozwiązanie</h2>
+      <ol>
+        <li>Mapa okolicy</li>
+        <li>Karta terenu (demo / WMS)</li>
+        <li>Lajki i komentarze</li>
+        <li>Roboczy wniosek (AI + katalog kosztów)</li>
+        <li>Złożenie w systemie miasta</li>
+      </ol>
+    </section>
+
+    <section class="slide">
+      <p class="brand">Sąsiedzki</p>
+      <h2>Demo flow</h2>
+      <p><strong>Zielony zakątek z ławkami</strong> — 2/3 poparcia → trzeci lajk → generator wniosku.</p>
+      <p class="tag">Konta: autor@example.com / sasiad@example.com</p>
+    </section>
+
+    <section class="slide">
+      <p class="brand">Sąsiedzki</p>
+      <h2>Teren</h2>
+      <p><strong>A</strong> — inny podmiot (ostrzeżenie).<br /><strong>B</strong> — grunt gminny w danych demo.</p>
+      <p>Tryby: live / cache / synthetic_demo / unavailable. Nigdy „pozytyw” przy braku danych.</p>
+    </section>
+
+    <section class="slide">
+      <p class="brand">Sąsiedzki</p>
+      <h2>Poparcie ≠ podpisy</h2>
+      <p>Lajk w aplikacji nie jest podpisem na liście BO ani głosem.</p>
+      <p>Oficjalna lista poparcia — według instrukcji miasta (15 podpisów).</p>
+    </section>
+
+    <section class="slide">
+      <p class="brand">Sąsiedzki</p>
+      <h2>Koszty z katalogu, nie z AI</h2>
+      <p>2 ławki + 4 drzewa → <strong>9 795–16 700 zł</strong> z cennika miejskiego.</p>
+      <p class="tag">Model redaguje tekst; sumy liczy backend/katalog.</p>
+    </section>
+
+    <section class="slide">
+      <p class="brand">Sąsiedzki</p>
+      <h2>Usterki poza sezonem BO</h2>
+      <p>Zdjęcie, lokalizacja, status społecznościowy + historia zmian.</p>
+      <p>„W naprawie przez miasto” tylko jako oznaczona symulacja.</p>
+    </section>
+
+    <section class="slide">
+      <p class="brand">Sąsiedzki</p>
+      <h2>Stack i limity</h2>
+      <p>PWA · Supabase · CityAdapter Kraków · mock AI (OpenAI po dodaniu klucza).</p>
+      <table>
+        <tr><th>Działa</th><th>Symulowane</th><th>Następny krok</th></tr>
+        <tr><td>Mapa, lajki, wniosek mock</td><td>Część WMS / status miasta</td><td>Klucz OpenAI, SMTP, Pages URL</td></tr>
+      </table>
+    </section>
+
+    <section class="slide">
+      <p class="brand">Sąsiedzki</p>
+      <h2>Następne kroki</h2>
+      <ul>
+        <li>Cloudflare Pages + QR</li>
+        <li>OPENAI_API_KEY w Edge Function</li>
+        <li>Pełniejszy MSIP, Web Push po hackathonie</li>
+      </ul>
+      <p class="tag">QR: /qr.html po wdrożeniu HTTPS URL</p>
+    </section>
+  </body>
+</html>

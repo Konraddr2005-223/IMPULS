@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sąsiedzki — QR dema</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100svh;
+        display: grid;
+        place-items: center;
+        font-family: system-ui, sans-serif;
+        background: #f7f8fa;
+        color: #17212b;
+        padding: 1.5rem;
+      }
+      main {
+        max-width: 28rem;
+        text-align: center;
+        background: #fff;
+        padding: 2rem;
+        border-radius: 12px;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+      }
+      h1 { color: #176b4b; margin: 0 0 0.75rem; font-size: 1.5rem; }
+      code {
+        display: block;
+        margin: 1rem 0;
+        padding: 0.75rem;
+        background: #f0f2f5;
+        border-radius: 8px;
+        word-break: break-all;
+      }
+      #qr {
+        width: 220px;
+        height: 220px;
+        margin: 1rem auto;
+        background: repeating-linear-gradient(
+          45deg,
+          #eee,
+          #eee 8px,
+          #fafafa 8px,
+          #fafafa 16px
+        );
+        display: grid;
+        place-items: center;
+        font-size: 0.85rem;
+        color: #666;
+      }
+      a { color: #2457d6; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Sąsiedzki</h1>
+      <p>Po wdrożeniu na Cloudflare Pages ustaw URL poniżej i wygeneruj QR (np. na qrcode.show / telefon).</p>
+      <label>
+        Publiczny URL dema
+        <input
+          id="url"
+          type="url"
+          placeholder="https://sasiedzki.pages.dev"
+          style="width: 100%; min-height: 44px; margin-top: 0.35rem; padding: 0.5rem"
+        />
+      </label>
+      <div id="qr">Wklej URL → Enter</div>
+      <code id="out">—</code>
+      <p>
+        <a id="link" href="/">Otwórz aplikację</a>
+      </p>
+    </main>
+    <script>
+      const input = document.getElementById('url')
+      const out = document.getElementById('out')
+      const link = document.getElementById('link')
+      const qr = document.getElementById('qr')
+      function sync() {
+        const u = input.value.trim() || location.origin + '/'
+        out.textContent = u
+        link.href = u
+        qr.innerHTML =
+          '<img alt="QR" width="200" height="200" src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&amp;data=' +
+          encodeURIComponent(u) +
+          '" />'
+      }
+      input.addEventListener('change', sync)
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') sync()
+      })
+      sync()
+    </script>
+  </body>
+</html>

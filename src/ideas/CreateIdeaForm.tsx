@@ -1,10 +1,15 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Camera, LocateFixed } from 'lucide-react'
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useForm } from 'react-hook-form'
 import { useAuth } from '../auth/AuthContext'
 import { demoAccounts } from '../auth/demoAccounts'
 import { getCurrentPosition } from '../lib/geolocation'
+import {
+  clearOfflineDraft,
+  loadOfflineDraft,
+  saveOfflineDraft,
+} from '../lib/offlineDraft'
 import { useOnline } from '../lib/online'
 import { uploadPhoto } from '../lib/storage'
 import { copy } from '../ui/copy'
@@ -42,10 +47,29 @@ export function CreateIdeaForm({
     },
   })
 
+  useEffect(() => {
+    const draft = loadOfflineDraft<CreateIdeaFormValues & { savedAt?: string }>(
+      'idea',
+      user?.id ?? null,
+    )
+    if (draft) {
+      form.reset({
+        title: draft.title ?? '',
+        description: draft.description ?? '',
+        category: draft.category ?? 'investment',
+        districtCode: draft.districtCode ?? 'Krowodrza',
+        supportThreshold: draft.supportThreshold ?? 3,
+        lat: draft.lat ?? initialPoint?.lat ?? 50.06143,
+        lng: draft.lng ?? initialPoint?.lng ?? 19.93658,
+      })
+    }
+  }, [user?.id, form, initialPoint])
+
   async function onSubmit(values: CreateIdeaFormValues) {
     setFormError(null)
     clearError()
     if (!online) {
+      saveOfflineDraft('idea', user?.id ?? null, values)
       setFormError(copy.offlineDraft)
       return
     }
@@ -64,6 +88,7 @@ export function CreateIdeaForm({
         districtCode: values.districtCode,
         photoPath,
       })
+      clearOfflineDraft('idea', user.id)
       onCreated(idea)
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Nie udało się zapisać.')

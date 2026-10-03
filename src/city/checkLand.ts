@@ -22,7 +22,6 @@ export async function checkLand(point: GeoPoint): Promise<LandAssessment> {
     // fall through to demo
   }
 
-  const demo = await krakowAdapter.checkLocation(point)
-  void writeLandCache(point, demo)
-  return demo
+  // Demo / unavailable — do not pollute 24h live cache
+  return krakowAdapter.checkLocation(point)
 }

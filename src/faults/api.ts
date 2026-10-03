@@ -1,6 +1,11 @@
 import { pointWkt } from '../ideas/geo'
 import { supabase } from '../lib/supabase'
-import type { CreateFaultInput, FaultRecord } from './types'
+import type {
+  CreateFaultInput,
+  FaultRecord,
+  FaultStatus,
+  FaultStatusEvent,
+} from './types'
 
 export async function fetchFaults(): Promise<FaultRecord[]> {
   if (!supabase) return []
@@ -42,6 +47,77 @@ export async function createFault(
     .single()
 
   if (error) throw error
+  return data as FaultRecord
+}
+
+export async function fetchFaultStatusHistory(
+  faultId: string,
+): Promise<FaultStatusEvent[]> {
+  if (!supabase) return []
+  const { data, error } = await supabase
+    .from('fault_status_events')
+    .select(
+      'id, fault_id, from_status, to_status, source, actor_id, note, created_at',
+    )
+    .eq('fault_id', faultId)
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  return (data as FaultStatusEvent[]) ?? []
+}
+
+export async function updateFaultStatus(input: {
+  faultId: string
+  actorId: string
+  nextStatus: FaultStatus
+  note?: string
+  /** Mark city repair as simulation-only. */
+  source?: string
+}): Promise<FaultRecord> {
+  if (!supabase) throw new Error('Supabase nie jest skonfigurowany.')
+
+  const { data: current, error: readErr } = await supabase
+    .from('faults')
+    .select(
+      'id, city_id, author_id, category, description, status, status_source, photo_path, external_reference, lat, lng, created_at',
+    )
+    .eq('id', input.faultId)
+    .single()
+  if (readErr) throw readErr
+
+  const fromStatus = current.status as string
+  const source =
+    input.source ??
+    (input.nextStatus === 'city_repair_sim' ? 'simulation' : 'author')
+
+  const { data, error } = await supabase
+    .from('faults')
+    .update({
+      status: input.nextStatus,
+      status_source: source,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', input.faultId)
+    .eq('author_id', input.actorId)
+    .select(
+      'id, city_id, author_id, category, description, status, status_source, photo_path, external_reference, lat, lng, created_at',
+    )
+    .single()
+  if (error) throw error
+
+  const { error: histErr } = await supabase.from('fault_status_events').insert({
+    fault_id: input.faultId,
+    from_status: fromStatus,
+    to_status: input.nextStatus,
+    source,
+    actor_id: input.actorId,
+    note:
+      input.note ??
+      (input.nextStatus === 'city_repair_sim'
+        ? 'Status demonstracyjny — nie potwierdzony przez urząd.'
+        : null),
+  })
+  if (histErr) throw histErr
+
   return data as FaultRecord
 }
 
