@@ -151,6 +151,20 @@ function MapCenterController({
   return null
 }
 
+function MapResizeObserver() {
+  const map = useMap()
+  useEffect(() => {
+    const container = map.getContainer()
+    if (!container || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => {
+      map.invalidateSize()
+    })
+    ro.observe(container)
+    return () => ro.disconnect()
+  }, [map])
+  return null
+}
+
 const wmsConfigs = {
   ownership: wmsSources.find((s) => s.id === 'ownership'),
   mpzp: wmsSources.find((s) => s.id === 'mpzp'),
@@ -178,6 +192,7 @@ export function MapCanvas({
     >
       <TileLayer attribution={OSM_ATTRIBUTION} url={OSM_TILE_URL} />
       <MapCenterController centerPoint={centerPoint} />
+      <MapResizeObserver />
 
       {wmsLayer === 'mpzp' && wmsConfigs.mpzp && (
         <WMSTileLayer

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import App from './App'
@@ -125,6 +125,10 @@ describe('App shell', () => {
     expect(screen.getByRole('heading', { name: 'Sąsiedzki' })).toBeInTheDocument()
     const nav = screen.getByRole('navigation', { name: 'Nawigacja dolna' })
     expect(within(nav).getByText('Mapa')).toBeInTheDocument()
+    expect(within(nav).queryByText('Dodaj')).not.toBeInTheDocument()
+    expect(within(nav).getByText('Powiadomienia')).toBeInTheDocument()
+    expect(within(nav).getByText('Moje')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '+ Dodaj' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Pomysły' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Usterki' })).toBeInTheDocument()
   })
@@ -137,19 +141,17 @@ describe('App shell', () => {
     expect(screen.getByText(/Scenariusz demonstracyjny/i)).toBeInTheDocument()
   })
 
-  it('opens create idea form from Dodaj tab', async () => {
+  it('opens create idea form from top Dodaj button', async () => {
     const user = userEvent.setup()
     renderApp()
-    const nav = screen.getByRole('navigation', { name: 'Nawigacja dolna' })
-    await user.click(within(nav).getByRole('button', { name: 'Dodaj' }))
+    await user.click(screen.getByRole('button', { name: '+ Dodaj' }))
     expect(screen.getByRole('heading', { name: 'Dodaj pomysł' })).toBeInTheDocument()
   })
 
   it('navigates back to map screen when logo is clicked', async () => {
     const user = userEvent.setup()
     renderApp()
-    const nav = screen.getByRole('navigation', { name: 'Nawigacja dolna' })
-    await user.click(within(nav).getByRole('button', { name: 'Dodaj' }))
+    await user.click(screen.getByRole('button', { name: '+ Dodaj' }))
     expect(screen.getByRole('heading', { name: 'Dodaj pomysł' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Sąsiedzki' }))
@@ -168,9 +170,29 @@ describe('App shell', () => {
   it('centers map on selected idea when clicked from the list', async () => {
     const user = userEvent.setup()
     renderApp()
-    await user.click(screen.getByRole('button', { name: 'Lista' }))
-    const ideaButton = await screen.findByRole('button', { name: /Zielony zakątek z ławkami/i })
+    expect(await screen.findByText(/Pomysły: db/i)).toBeInTheDocument()
+    const ideaButton = screen.getByRole('button', { name: /Zielony zakątek z ławkami/i })
     await user.click(ideaButton)
-    expect(screen.getByTestId('map-center-point').textContent).toMatch(/^50\.07/)
+    await waitFor(() => {
+      expect(screen.getByTestId('map-center-point').textContent).toMatch(/^50\.07/)
+    })
+  })
+
+  it('allows hiding and showing the top ideas list via the hide button', async () => {
+    const user = userEvent.setup()
+    renderApp()
+    expect(await screen.findByText('Topowe pomysły')).toBeInTheDocument()
+
+    // Click the hide button
+    const hideBtn = screen.getByRole('button', { name: 'Schowaj listę' })
+    await user.click(hideBtn)
+
+    // The list is now hidden
+    expect(screen.queryByText('Topowe pomysły')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Pokaż listę' })).toBeInTheDocument()
+
+    // Click the show button to bring it back
+    await user.click(screen.getByRole('button', { name: 'Pokaż listę' }))
+    expect(await screen.findByText('Topowe pomysły')).toBeInTheDocument()
   })
 })

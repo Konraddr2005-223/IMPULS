@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
-import { Layers } from 'lucide-react'
+import { Layers, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { ApplicationEditor } from './applications/ApplicationEditor'
 import {
   PrepareApplicationForm,
@@ -42,12 +42,10 @@ import { copy } from './ui/copy'
 
 type TabId = 'mapa' | 'dodaj' | 'powiadomienia' | 'moje'
 type MapLayer = 'pomysly' | 'usterki'
-type MapMode = 'mapa' | 'lista'
 type AddKind = 'idea' | 'fault'
 type MojeView = 'home' | 'areas'
-const TABS: { id: TabId; label: string }[] = [
+const NAV_TABS: { id: Exclude<TabId, 'dodaj'>; label: string }[] = [
   { id: 'mapa', label: 'Mapa' },
-  { id: 'dodaj', label: 'Dodaj' },
   { id: 'powiadomienia', label: 'Powiadomienia' },
   { id: 'moje', label: 'Moje' },
 ]
@@ -60,7 +58,6 @@ function App() {
   const [addKind, setAddKind] = useState<AddKind>('idea')
   const [mojeView, setMojeView] = useState<MojeView>('home')
   const [layer, setLayer] = useState<MapLayer>('pomysly')
-  const [mode, setMode] = useState<MapMode>('mapa')
   const [filterByAreas, setFilterByAreas] = useState(false)
   const [ideaFilters, setIdeaFilters] = useState<IdeaListFilters>(emptyIdeaFilters)
   const [wmsLayer, setWmsLayer] = useState<WmsLayerId>('none')
@@ -239,7 +236,6 @@ function App() {
     setApplication(null)
     setPrepareOpen(false)
     setTab('mapa')
-    setMode('mapa')
     setMojeView('home')
     setSelectedIdeaId(null)
     setSelectedFaultId(null)
@@ -310,7 +306,6 @@ function App() {
         {tab === 'mapa' && (
           <MapScreen
             layer={layer}
-            mode={mode}
             land={land}
             landLoading={landLoading}
             landError={landError}
@@ -337,7 +332,6 @@ function App() {
               setSelectedIdeaId(null)
               setSelectedFaultId(null)
             }}
-            onModeChange={setMode}
             onAdd={() => {
               setAddKind(layer === 'usterki' ? 'fault' : 'idea')
               setTab('dodaj')
@@ -349,7 +343,6 @@ function App() {
               setDraftPoint(null)
               setLand(null)
               setLandError(null)
-              setMode('mapa')
             }}
             onSelectFault={(id) => {
               setSelectedFaultId(id)
@@ -357,7 +350,6 @@ function App() {
               setDraftPoint(null)
               setLand(null)
               setLandError(null)
-              setMode('mapa')
             }}
             onCloseIdea={() => setSelectedIdeaId(null)}
             onCloseFault={() => setSelectedFaultId(null)}
@@ -408,7 +400,6 @@ function App() {
             onSwitchToFault={() => setAddKind('fault')}
             onPickOnMainMap={() => {
               setTab('mapa')
-              setMode('mapa')
             }}
             onCreated={() => {
               void qc.invalidateQueries({ queryKey: ['ideas'] })
@@ -423,7 +414,6 @@ function App() {
             onSwitchToIdea={() => setAddKind('idea')}
             onPickOnMainMap={() => {
               setTab('mapa')
-              setMode('mapa')
             }}
             onCreated={() => {
               void qc.invalidateQueries({ queryKey: ['faults'] })
@@ -455,10 +445,10 @@ function App() {
       </main>
 
       <nav
-        className="md:hidden shrink-0 border-t border-black/5 bg-white px-2 py-1 grid grid-cols-4 gap-1 text-xs text-center z-20"
+        className="md:hidden shrink-0 border-t border-black/5 bg-white px-2 py-1 grid grid-cols-3 gap-1 text-xs text-center z-20"
         aria-label="Nawigacja dolna"
       >
-        {TABS.map(({ id, label }) => (
+        {NAV_TABS.map(({ id, label }) => (
           <NavButton
             key={id}
             label={label}
@@ -475,7 +465,7 @@ function App() {
         className="hidden md:flex shrink-0 border-t border-black/5 bg-white px-4 py-2 justify-center gap-6 text-sm z-20"
         aria-label="Nawigacja"
       >
-        {TABS.map(({ id, label }) => (
+        {NAV_TABS.map(({ id, label }) => (
           <NavButton
             key={id}
             label={label}
@@ -520,7 +510,6 @@ function NavButton({
 
 type MapScreenProps = {
   layer: MapLayer
-  mode: MapMode
   land: LandAssessment | null
   landLoading: boolean
   landError: string | null
@@ -543,7 +532,6 @@ type MapScreenProps = {
   onIdeaFiltersChange: (f: IdeaListFilters) => void
   onWmsLayerChange: (layer: WmsLayerId) => void
   onLayerChange: (layer: MapLayer) => void
-  onModeChange: (mode: MapMode) => void
   onAdd: () => void
   onMapClick: (point: { lat: number; lng: number }) => void
   onSelectIdea: (id: string) => void
@@ -568,7 +556,6 @@ type MapScreenProps = {
 
 function MapScreen({
   layer,
-  mode,
   land,
   landLoading,
   landError,
@@ -591,7 +578,6 @@ function MapScreen({
   onIdeaFiltersChange,
   onWmsLayerChange,
   onLayerChange,
-  onModeChange,
   onAdd,
   onMapClick,
   onSelectIdea,
@@ -613,6 +599,21 @@ function MapScreen({
   onAddIdeaAtPoint,
   onAddFaultAtPoint,
 }: MapScreenProps) {
+  const [showTopIdeas, setShowTopIdeas] = useState(true)
+
+  const listCount =
+    layer === 'pomysly'
+      ? ideas
+        ? ideas.length
+        : demoIdeas.length
+      : faults
+        ? faults.length
+        : demoFaults.length
+
+  const listTitle = layer === 'pomysly' ? 'Topowe pomysły' : 'Lista usterek'
+  const hideButtonLabel = layer === 'pomysly' ? 'Schowaj listę pomysłów' : 'Schowaj listę usterek'
+  const showButtonLabel = layer === 'pomysly' ? 'Pokaż listę pomysłów' : 'Pokaż listę usterek'
+
   const topIdeaIds = useMemo(() => {
     const list = ideas ?? demoIdeas
     return new Set(list.slice(0, 3).map((i) => i.id))
@@ -825,26 +826,28 @@ function MapScreen({
           </select>
         </div>
 
-        <div
-          className="inline-flex rounded-[var(--radius-card)] bg-[var(--color-bg)] p-1 ml-auto"
-          role="group"
-          aria-label="Widok"
+        <button
+          type="button"
+          onClick={() => setShowTopIdeas((prev) => !prev)}
+          className={`hidden md:inline-flex items-center gap-1.5 min-h-9 px-3 rounded-[var(--radius-card)] border border-black/10 text-xs font-medium cursor-pointer transition-colors ${
+            showTopIdeas
+              ? 'bg-white text-[var(--color-text)]/80 hover:bg-black/5'
+              : 'bg-white text-[var(--color-ideas)] shadow-xs hover:bg-black/5 font-semibold'
+          }`}
+          title={showTopIdeas ? hideButtonLabel : showButtonLabel}
+          aria-label={showTopIdeas ? 'Schowaj listę' : 'Pokaż listę'}
         >
-          <ModeButton active={mode === 'mapa'} onClick={() => onModeChange('mapa')}>
-            Mapa
-          </ModeButton>
-          <ModeButton active={mode === 'lista'} onClick={() => onModeChange('lista')}>
-            Lista
-          </ModeButton>
-        </div>
+          {showTopIdeas ? <PanelLeftClose size={14} /> : <PanelLeftOpen size={14} />}
+          <span>{showTopIdeas ? 'Schowaj listę' : 'Pokaż listę'}</span>
+        </button>
 
         <button
           type="button"
           onClick={onAdd}
-          className="hidden md:inline-flex items-center justify-center min-h-11 px-4 rounded-[var(--radius-card)] border-0 text-white text-sm font-medium cursor-pointer shadow-sm hover:opacity-95"
+          className="ml-auto inline-flex items-center justify-center min-h-9 md:min-h-11 px-4 rounded-[var(--radius-card)] border-0 text-white text-xs md:text-sm font-semibold cursor-pointer shadow-sm hover:opacity-90 transition-opacity"
           style={{ background: 'var(--color-action)' }}
         >
-          Dodaj
+          + Dodaj
         </button>
       </div>
 
@@ -860,12 +863,31 @@ function MapScreen({
         )}
       </p>
 
-      <div className="flex-1 min-h-0 grid md:grid-cols-[minmax(280px,360px)_1fr]">
-        <aside
-          className={`${mode === 'lista' ? 'flex' : 'hidden'} md:flex flex-col min-h-0 border-r border-black/5 bg-white overflow-y-auto`}
-          aria-label={layer === 'pomysly' ? 'Lista pomysłów' : 'Lista usterek'}
-        >
-          {layer === 'pomysly' ? (
+      <div className={`flex-1 min-h-0 grid ${showTopIdeas ? 'md:grid-cols-[minmax(280px,360px)_1fr]' : 'grid-cols-1'}`}>
+        {showTopIdeas && (
+          <aside
+            className="hidden md:flex flex-col min-h-0 border-r border-black/5 bg-white overflow-y-auto"
+            aria-label={layer === 'pomysly' ? 'Lista pomysłów' : 'Lista usterek'}
+          >
+            <div className="shrink-0 px-3.5 py-2.5 border-b border-black/5 bg-[var(--color-bg)]/60 flex items-center justify-between gap-2 sticky top-0 z-10 backdrop-blur-xs">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--color-text)]">
+                <span>{listTitle}</span>
+                <span className="text-[11px] font-normal text-[var(--color-text)]/50">
+                  ({listCount})
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowTopIdeas(false)}
+                className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md text-[var(--color-text)]/70 hover:text-[var(--color-text)] hover:bg-black/5 border-0 bg-transparent cursor-pointer font-medium transition-colors"
+                title={hideButtonLabel}
+                aria-label={hideButtonLabel}
+              >
+                <PanelLeftClose size={14} />
+                <span>Schowaj</span>
+              </button>
+            </div>
+            {layer === 'pomysly' ? (
             <ul className="m-0 p-0 list-none divide-y divide-black/5">
               {ideas ? (
                 ideas.length === 0 ? (
@@ -1012,11 +1034,27 @@ function MapScreen({
 
           )}
         </aside>
+      )}
 
-        <section
-          className={`${mode === 'mapa' ? 'relative' : 'hidden md:relative'} min-h-[50svh] md:min-h-0`}
-          aria-label="Mapa okolicy"
-        >
+      <section
+        className="relative flex-1 min-h-[50svh] md:min-h-0"
+        aria-label="Mapa okolicy"
+      >
+        {!showTopIdeas && (
+          <button
+            type="button"
+            onClick={() => setShowTopIdeas(true)}
+            className="hidden md:inline-flex absolute top-3 left-3 z-10 items-center gap-1.5 px-3 py-2 rounded-[var(--radius-card)] bg-white/95 backdrop-blur-xs border border-black/10 shadow-md text-xs font-semibold text-[var(--color-text)] hover:bg-white cursor-pointer transition-all hover:shadow-lg"
+            title={showButtonLabel}
+            aria-label={showButtonLabel}
+          >
+            <PanelLeftOpen
+              size={15}
+              style={{ color: layer === 'pomysly' ? 'var(--color-ideas)' : 'var(--color-faults)' }}
+            />
+            <span>{showButtonLabel}</span>
+          </button>
+        )}
           <MapCanvas
             className="absolute inset-0 h-full w-full z-0"
             markers={markers}
@@ -1129,32 +1167,6 @@ function LayerTab({
       style={{
         background: active ? accent : 'transparent',
         color: active ? '#fff' : 'var(--color-text)',
-      }}
-    >
-      {children}
-    </button>
-  )
-}
-
-function ModeButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean
-  onClick: () => void
-  children: string
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className="min-h-10 px-3 rounded-[calc(var(--radius-card)-4px)] border-0 text-sm font-medium cursor-pointer"
-      style={{
-        background: active ? '#fff' : 'transparent',
-        color: 'var(--color-text)',
-        boxShadow: active ? '0 0 0 1px rgba(0,0,0,0.06)' : 'none',
       }}
     >
       {children}
