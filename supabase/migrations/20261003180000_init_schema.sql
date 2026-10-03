@@ -148,6 +148,7 @@ declare
   target uuid;
 begin
   target := coalesce(new.idea_id, old.idea_id);
+  perform set_config('app.updating_likes_count', 'on', true);
   update public.ideas
   set likes_count = (select count(*)::integer from public.idea_likes where idea_id = target),
       updated_at = now()
@@ -223,6 +224,9 @@ returns trigger
 language plpgsql
 as $$
 begin
+  if current_setting('app.updating_likes_count', true) = 'on' then
+    return new;
+  end if;
   new.likes_count := old.likes_count;
   return new;
 end;
