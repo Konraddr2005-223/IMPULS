@@ -72,6 +72,31 @@ describe('MapCanvas', () => {
     expect(container.querySelector('.leaflet-container')).toBeInTheDocument()
   })
 
+  it('renders merged polygons on the map', () => {
+    const mergedPolygons = [
+      {
+        outer: [
+          { lat: 50.06, lng: 19.93 },
+          { lat: 50.07, lng: 19.93 },
+          { lat: 50.07, lng: 19.94 },
+          { lat: 50.06, lng: 19.94 },
+        ],
+        holes: [],
+      },
+    ]
+
+    const { container } = render(
+      <MapCanvas
+        mergedPolygons={mergedPolygons}
+        markers={[]}
+        onMapClick={vi.fn()}
+      />,
+    )
+
+    expect(container.querySelector('.leaflet-container')).toBeInTheDocument()
+    expect(container.querySelector('path.leaflet-interactive')).toBeInTheDocument()
+  })
+
   it('exports PROXIMITY_THRESHOLD_PX constant of at least 28px', () => {
     expect(PROXIMITY_THRESHOLD_PX).toBeGreaterThanOrEqual(28)
   })

@@ -9,7 +9,8 @@ import {
 import { generateAndSaveApplication } from './applications/api'
 import type { ApplicationRecord } from './applications/types'
 import { AreasScreen } from './areas/AreasScreen'
-import { ideaMatchesAreas, listInterestAreas } from './areas/api'
+import { ideaMatchesAreas, listInterestAreas, type InterestArea } from './areas/api'
+import { mergePolygonAreas, type LatLngPoint } from './areas/polygon'
 import { AuthBar } from './auth/AuthBar'
 import { useAuth } from './auth/AuthContext'
 import { checkLand } from './city/checkLand'
@@ -517,7 +518,7 @@ type MapScreenProps = {
   ideas: IdeaRecord[] | null
   demoIdeas: typeof demoIdeas
   faults: FaultRecord[] | null
-  areas: { id: string; lat: number | null; lng: number | null; radius_m: number | null; kind: string }[]
+  areas: InterestArea[]
   filterByAreas: boolean
   ideaFilters: IdeaListFilters
   districtOptions: string[]
@@ -684,6 +685,24 @@ function MapScreen({
         })),
     [areas],
   )
+
+  const mergedPolygons = useMemo(() => {
+    const rawPolys: LatLngPoint[][] = []
+    for (const a of areas) {
+      if (a.polygon_points && a.polygon_points.length >= 3) {
+        rawPolys.push(a.polygon_points)
+      } else if (a.kind === 'radius' && a.lat != null && a.lng != null && a.radius_m != null) {
+        const d = a.radius_m / 111320
+        rawPolys.push([
+          { lat: a.lat + d, lng: a.lng - d },
+          { lat: a.lat + d, lng: a.lng + d },
+          { lat: a.lat - d, lng: a.lng + d },
+          { lat: a.lat - d, lng: a.lng - d },
+        ])
+      }
+    }
+    return mergePolygonAreas(rawPolys)
+  }, [areas])
 
   const centerPoint = useMemo(() => {
     if (selectedIdea) return { lat: selectedIdea.lat, lng: selectedIdea.lng }
@@ -1056,6 +1075,7 @@ function MapScreen({
             className="absolute inset-0 h-full w-full z-0"
             markers={markers}
             circles={circles}
+            mergedPolygons={mergedPolygons}
             draftPoint={draftPoint}
             centerPoint={centerPoint}
             wmsLayer={wmsLayer}

@@ -17,11 +17,17 @@ const mockExistingAreas = [
     user_id: 'u1',
     city_id: 'krakow',
     name: 'Park Krakowski',
-    kind: 'radius' as const,
+    kind: 'polygon' as const,
     district_code: null,
     lat: 50.068,
     lng: 19.925,
-    radius_m: 750,
+    radius_m: null,
+    polygon_points: [
+      { lat: 50.067, lng: 19.924 },
+      { lat: 50.069, lng: 19.924 },
+      { lat: 50.069, lng: 19.926 },
+      { lat: 50.067, lng: 19.926 },
+    ],
     created_at: '2026-10-01',
   },
   {
@@ -34,6 +40,7 @@ const mockExistingAreas = [
     lat: null,
     lng: null,
     radius_m: null,
+    polygon_points: null,
     created_at: '2026-10-02',
   },
 ]
@@ -41,8 +48,8 @@ const mockExistingAreas = [
 vi.mock('./api', () => ({
   KRAKOW_DISTRICTS: ['Stare Miasto', 'Krowodrza', 'Podgórze'],
   createDistrictArea: vi.fn().mockResolvedValue({ id: 'd1' }),
-  createRadiusArea: vi.fn().mockResolvedValue({ id: 'r1' }),
-  updateRadiusArea: vi.fn().mockResolvedValue(undefined),
+  createPolygonArea: vi.fn().mockResolvedValue(undefined),
+  updatePolygonArea: vi.fn().mockResolvedValue(undefined),
   updateDistrictArea: vi.fn().mockResolvedValue(undefined),
   deleteInterestArea: vi.fn().mockResolvedValue(undefined),
   listInterestAreas: vi.fn().mockImplementation(() => Promise.resolve(mockExistingAreas)),
@@ -56,41 +63,33 @@ describe('AreasScreen', () => {
     return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>)
   }
 
-  it('renders interactive map location picker and radius slider when opened with draftPoint', async () => {
+  it('renders interactive map polygon picker when opened with draftPoint', async () => {
     renderWithClient(<AreasScreen draftPoint={{ lat: 50.0614, lng: 19.9366 }} />)
 
-    expect(screen.getByText('Wskaż środek okolicy na mapie')).toBeInTheDocument()
+    expect(screen.getByText('Wyznacz wierzchołki na mapie')).toBeInTheDocument()
     expect(
-      screen.getByText(/Kliknij na mapie, aby ustawić centrum/i),
+      screen.getByText(/Klikaj na mapie, aby ustawić do 4 wierzchołków/i),
     ).toBeInTheDocument()
-
-    const slider = screen.getByRole('slider', { name: /Promień obszaru/i })
-    expect(slider).toBeInTheDocument()
-    expect(slider).toHaveValue('500')
-    expect(screen.getAllByText('500 m').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText('Czworokąt gotowy (4 / 4 wierzchołki)')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Zapisz okolicę' })).toBeInTheDocument()
   })
 
-  it('submits point and selected radius on click, then closes form and shows success banner', async () => {
+  it('submits polygon area on click, then closes form and shows success banner', async () => {
     const user = userEvent.setup()
-    const { createRadiusArea } = await import('./api')
+    const { createPolygonArea } = await import('./api')
 
     renderWithClient(<AreasScreen draftPoint={{ lat: 50.0614, lng: 19.9366 }} />)
-
-    // Click 1 km preset
-    const preset1km = screen.getByRole('button', { name: '1 km' })
-    await user.click(preset1km)
 
     // Click save
     const saveBtn = screen.getByRole('button', { name: 'Zapisz okolicę' })
     await user.click(saveBtn)
 
-    expect(createRadiusArea).toHaveBeenCalledWith(
+    expect(createPolygonArea).toHaveBeenCalledWith(
       'u1',
       'Moja okolica',
-      50.0614,
-      19.9366,
-      1000,
+      expect.arrayContaining([
+        expect.objectContaining({ lat: expect.any(Number), lng: expect.any(Number) }),
+      ]),
     )
 
     // Form should now be closed and success message visible
@@ -100,9 +99,9 @@ describe('AreasScreen', () => {
     })
   })
 
-  it('allows editing an existing area and saves updates via updateRadiusArea', async () => {
+  it('allows editing an existing polygon area and saves updates via updatePolygonArea', async () => {
     const user = userEvent.setup()
-    const { updateRadiusArea } = await import('./api')
+    const { updatePolygonArea } = await import('./api')
 
     renderWithClient(<AreasScreen />)
 
@@ -123,13 +122,11 @@ describe('AreasScreen', () => {
     const saveChangesBtn = screen.getByRole('button', { name: /Zapisz zmiany/i })
     await user.click(saveChangesBtn)
 
-    expect(updateRadiusArea).toHaveBeenCalledWith(
+    expect(updatePolygonArea).toHaveBeenCalledWith(
       'area-1',
       'u1',
       'Nowy Park',
-      50.068,
-      19.925,
-      750,
+      expect.any(Array),
     )
 
     // Form closes and shows success message

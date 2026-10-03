@@ -3,6 +3,7 @@ import {
   Circle,
   CircleMarker,
   MapContainer,
+  Polygon,
   TileLayer,
   Tooltip,
   WMSTileLayer,
@@ -10,6 +11,7 @@ import {
   useMapEvents,
 } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
+import type { MergedPolygon } from '../areas/polygon'
 import {
   KRAKOW_CENTER,
   KRAKOW_DEFAULT_ZOOM,
@@ -42,6 +44,7 @@ type MapCanvasProps = {
   className?: string
   markers?: MapMarker[]
   circles?: MapCircle[]
+  mergedPolygons?: MergedPolygon[]
   draftPoint?: { lat: number; lng: number } | null
   centerPoint?: { lat: number; lng: number } | null
   wmsLayer?: WmsLayerId
@@ -174,6 +177,7 @@ export function MapCanvas({
   className,
   markers = [],
   circles = [],
+  mergedPolygons = [],
   draftPoint,
   centerPoint,
   wmsLayer = 'none',
@@ -266,6 +270,34 @@ export function MapCanvas({
           }}
         />
       ))}
+
+      {mergedPolygons.map((poly, idx) => {
+        const positions =
+          poly.holes.length > 0
+            ? [
+                poly.outer.map((p) => [p.lat, p.lng] as [number, number]),
+                ...poly.holes.map((h) => h.map((p) => [p.lat, p.lng] as [number, number])),
+              ]
+            : poly.outer.map((p) => [p.lat, p.lng] as [number, number])
+
+        return (
+          <Polygon
+            key={`merged-poly-${idx}-${poly.outer.length}`}
+            positions={positions}
+            pathOptions={{
+              color: '#176B4B',
+              fillColor: '#176B4B',
+              fillOpacity: 0.12,
+              weight: 2,
+              dashArray: '5, 5',
+            }}
+          >
+            <Tooltip direction="top" offset={[0, -4]}>
+              <span className="text-xs font-semibold">Moja okolica (obszar połączony)</span>
+            </Tooltip>
+          </Polygon>
+        )
+      })}
 
       {markers.map((marker) => {
         const isIdea = marker.kind === 'idea'

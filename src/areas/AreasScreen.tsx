@@ -3,31 +3,47 @@ import {
   AlertCircle,
   Building2,
   CheckCircle2,
-  MapPin,
+  Layers,
   MapPinned,
   Pencil,
   Plus,
+  Shapes,
   Trash2,
   X,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { getCurrentPosition } from '../lib/geolocation'
-import { LocationPicker } from '../map/LocationPicker'
+import { PolygonPicker } from '../map/PolygonPicker'
 import { copy } from '../ui/copy'
 import {
   KRAKOW_DISTRICTS,
   createDistrictArea,
-  createRadiusArea,
+  createPolygonArea,
   deleteInterestArea,
   listInterestAreas,
   updateDistrictArea,
-  updateRadiusArea,
+  updatePolygonArea,
   type InterestArea,
 } from './api'
+import {
+  mergePolygonAreas,
+  type LatLngPoint,
+} from './polygon'
 
 type AreasScreenProps = {
   draftPoint?: { lat: number; lng: number } | null
+}
+
+function makeDefaultQuad(center: LatLngPoint): LatLngPoint[] {
+  const deltaLat = 0.002
+  const deltaLng = 0.003
+  return [
+    { lat: Number((center.lat + deltaLat).toFixed(5)), lng: Number((center.lng - deltaLng).toFixed(5)) },
+    { lat: Number((center.lat + deltaLat).toFixed(5)), lng: Number((center.lng + deltaLng).toFixed(5)) },
+    { lat: Number((center.lat - deltaLat).toFixed(5)), lng: Number((center.lng + deltaLng).toFixed(5)) },
+    { lat: Number((center.lat - deltaLat).toFixed(5)), lng: Number((center.lng - deltaLng).toFixed(5)) },
+  ]
 }
 
 export function AreasScreen({ draftPoint }: AreasScreenProps) {
@@ -36,13 +52,13 @@ export function AreasScreen({ draftPoint }: AreasScreenProps) {
 
   const [isFormOpen, setIsFormOpen] = useState(Boolean(draftPoint))
   const [editingArea, setEditingArea] = useState<InterestArea | null>(null)
-  const [formKind, setFormKind] = useState<'radius' | 'district'>('radius')
+  const [formKind, setFormKind] = useState<'polygon' | 'district'>('polygon')
 
   const [district, setDistrict] = useState<string>(KRAKOW_DISTRICTS[4])
-  const [radiusName, setRadiusName] = useState('Moja okolica')
-  const [radiusM, setRadiusM] = useState(500)
-  const [lat, setLat] = useState(draftPoint?.lat ?? 50.06143)
-  const [lng, setLng] = useState(draftPoint?.lng ?? 19.93658)
+  const [areaName, setAreaName] = useState('Moja okolica')
+  const [polygonPoints, setPolygonPoints] = useState<LatLngPoint[]>(
+    draftPoint ? makeDefaultQuad(draftPoint) : [],
+  )
 
   const [locating, setLocating] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -52,10 +68,9 @@ export function AreasScreen({ draftPoint }: AreasScreenProps) {
 
   useEffect(() => {
     if (draftPoint) {
-      setLat(draftPoint.lat)
-      setLng(draftPoint.lng)
+      setPolygonPoints(makeDefaultQuad(draftPoint))
       setIsFormOpen(true)
-      setFormKind('radius')
+      setFormKind('polygon')
     }
   }, [draftPoint])
 
@@ -86,8 +101,7 @@ export function AreasScreen({ draftPoint }: AreasScreenProps) {
       setError(copy.gpsDenied)
       return
     }
-    setLat(pos.lat)
-    setLng(pos.lng)
+    setPolygonPoints(makeDefaultQuad({ lat: pos.lat, lng: pos.lng }))
   }
 
   const query = useQuery({
@@ -102,7 +116,7 @@ export function AreasScreen({ draftPoint }: AreasScreenProps) {
         <section className="rounded-[var(--radius-card)] bg-white p-6 border border-black/5 shadow-xs">
           <h2 className="m-0 text-lg font-semibold">Moje okolice</h2>
           <p className="mt-2 mb-4 text-sm text-[var(--color-text)]/70">
-            Zaloguj się, aby zapisać swoje ulubione dzielnice i promienie zainteresowania na mapie.
+            Zaloguj się, aby zapisać swoje ulubione wielokątne okolice i dzielnice na mapie.
           </p>
           <div className="flex flex-wrap gap-2">
             <button
@@ -133,11 +147,9 @@ export function AreasScreen({ draftPoint }: AreasScreenProps) {
 
   function startAdding() {
     setEditingArea(null)
-    setFormKind('radius')
-    setRadiusName('Moja okolica')
-    setRadiusM(500)
-    setLat(draftPoint?.lat ?? 50.06143)
-    setLng(draftPoint?.lng ?? 19.93658)
+    setFormKind('polygon')
+    setAreaName('Moja okolica')
+    setPolygonPoints(draftPoint ? makeDefaultQuad(draftPoint) : [])
     setDistrict(KRAKOW_DISTRICTS[4])
     setError(null)
     setIsFormOpen(true)
@@ -145,14 +157,19 @@ export function AreasScreen({ draftPoint }: AreasScreenProps) {
 
   function startEditing(area: InterestArea) {
     setEditingArea(area)
-    setFormKind(area.kind)
-    setRadiusName(area.name)
-    if (area.kind === 'radius') {
-      setLat(area.lat ?? 50.06143)
-      setLng(area.lng ?? 19.93658)
-      setRadiusM(area.radius_m ?? 500)
-    } else {
+    setAreaName(area.name)
+    if (area.kind === 'district') {
+      setFormKind('district')
       setDistrict(area.district_code ?? KRAKOW_DISTRICTS[0])
+    } else {
+      setFormKind('polygon')
+      if (area.polygon_points && area.polygon_points.length >= 3) {
+        setPolygonPoints(area.polygon_points)
+      } else if (area.lat != null && area.lng != null) {
+        setPolygonPoints(makeDefaultQuad({ lat: area.lat, lng: area.lng }))
+      } else {
+        setPolygonPoints([])
+      }
     }
     setError(null)
     setIsFormOpen(true)
@@ -169,28 +186,33 @@ export function AreasScreen({ draftPoint }: AreasScreenProps) {
     setSaving(true)
     setError(null)
     try {
+      if (formKind === 'polygon') {
+        if (polygonPoints.length < 3 || polygonPoints.length > 4) {
+          throw new Error('Obszar musi posiadać 3 lub 4 wierzchołki (maksymalnie czworokąt).')
+        }
+      }
+
       if (editingArea) {
-        if (formKind === 'radius') {
-          await updateRadiusArea(editingArea.id, user.id, radiusName, lat, lng, radiusM)
+        if (formKind === 'polygon') {
+          await updatePolygonArea(editingArea.id, user.id, areaName, polygonPoints)
         } else {
           await updateDistrictArea(editingArea.id, user.id, district)
         }
         setSuccessMessage(
-          `Zaktualizowano okolicę: ${formKind === 'radius' ? radiusName : district}`,
+          `Zaktualizowano okolicę: ${formKind === 'polygon' ? areaName : district}`,
         )
         setJustUpdatedId(editingArea.id)
       } else {
-        if (formKind === 'radius') {
-          await createRadiusArea(user.id, radiusName, lat, lng, radiusM)
+        if (formKind === 'polygon') {
+          await createPolygonArea(user.id, areaName, polygonPoints)
         } else {
           await createDistrictArea(user.id, district)
         }
         setSuccessMessage(
-          `Dodano nową okolicę: ${formKind === 'radius' ? radiusName : district}`,
+          `Dodano nową okolicę: ${formKind === 'polygon' ? areaName : district}`,
         )
       }
       await refresh()
-      // Close form immediately after adding/updating
       setIsFormOpen(false)
       setEditingArea(null)
     } catch (err) {
@@ -201,6 +223,25 @@ export function AreasScreen({ draftPoint }: AreasScreenProps) {
   }
 
   const areas = query.data ?? []
+
+  // Check if multiple polygon areas exist and calculate merged union
+  const polygonAreas = useMemo(
+    () =>
+      areas.filter(
+        (a) =>
+          (a.kind === 'polygon' && a.polygon_points && a.polygon_points.length >= 3) ||
+          (a.polygon_points && a.polygon_points.length >= 3),
+      ),
+    [areas],
+  )
+
+  const mergedPolygons = useMemo(
+    () => mergePolygonAreas(polygonAreas.map((a) => a.polygon_points!)),
+    [polygonAreas],
+  )
+
+  const hasMergedIntersection =
+    polygonAreas.length > 1 && mergedPolygons.length < polygonAreas.length
 
   return (
     <div className="flex-1 mx-auto w-full max-w-xl px-4 py-6 overflow-y-auto">
@@ -222,8 +263,8 @@ export function AreasScreen({ draftPoint }: AreasScreenProps) {
       </div>
 
       <p className="mt-0 mb-4 text-xs text-[var(--color-text)]/65">
-        Dzielnice z listy lub wybrane punkty na mapie z promieniem 50–2000 m. Filtr mapy łączy
-        obszary operatorem OR.
+        Obszary wielokątne (maksymalnie czworokąty) lub całe dzielnice. Przecinające się okolice
+        automatycznie łączą się w jeden wspólny obszar na mapie.
       </p>
 
       {/* Success notification banner */}
@@ -268,6 +309,33 @@ export function AreasScreen({ draftPoint }: AreasScreenProps) {
         </div>
       )}
 
+      {/* Merged Areas Banner */}
+      {polygonAreas.length > 1 && (
+        <div
+          className={`mb-4 p-3 rounded-[var(--radius-card)] border flex items-center gap-3 text-xs shadow-xs transition-all ${
+            hasMergedIntersection
+              ? 'bg-emerald-50/80 border-emerald-200 text-emerald-900'
+              : 'bg-blue-50/70 border-blue-200 text-blue-900'
+          }`}
+        >
+          <Layers size={18} className={hasMergedIntersection ? 'text-emerald-600 shrink-0' : 'text-blue-600 shrink-0'} />
+          <div>
+            <span className="font-semibold block">
+              {hasMergedIntersection
+                ? 'Połączone okolice (Merged) ✨'
+                : 'Zasada łączenia okolic'}
+            </span>
+            <span className="opacity-80">
+              {hasMergedIntersection
+                ? `Przecinające się wielokąty (${polygonAreas.length}) tworzą na mapie ${
+                    mergedPolygons.length === 1 ? '1 dużą wspólną strefę' : `${mergedPolygons.length} połączone strefy`
+                  }.`
+                : `${polygonAreas.length} zapisane okolice są obecnie rozłączne. Jeśli ich granice przetną się, połączą się w 1 obszar.`}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Add / Edit Form Card */}
       {isFormOpen && (
         <section
@@ -300,14 +368,14 @@ export function AreasScreen({ draftPoint }: AreasScreenProps) {
           <div className="flex p-0.5 rounded-lg bg-black/5 text-xs font-medium">
             <button
               type="button"
-              onClick={() => setFormKind('radius')}
+              onClick={() => setFormKind('polygon')}
               className={`flex-1 py-1.5 px-3 rounded-md transition-all cursor-pointer border-0 flex items-center justify-center gap-1.5 ${
-                formKind === 'radius'
+                formKind === 'polygon'
                   ? 'bg-white text-[var(--color-text)] shadow-xs font-semibold'
                   : 'bg-transparent text-[var(--color-text)]/70 hover:text-[var(--color-text)]'
               }`}
             >
-              <MapPin size={14} /> Punkt z promieniem
+              <Shapes size={14} /> Wielokąt (maks. 4 wierzchołki)
             </button>
             <button
               type="button"
@@ -322,42 +390,30 @@ export function AreasScreen({ draftPoint }: AreasScreenProps) {
             </button>
           </div>
 
-          {/* Fields for Radius */}
-          {formKind === 'radius' && (
+          {/* Fields for Polygon */}
+          {formKind === 'polygon' && (
             <div className="space-y-3">
               <label className="flex flex-col gap-1 text-sm font-medium">
                 Nazwa okolicy
                 <input
-                  value={radiusName}
-                  onChange={(e) => setRadiusName(e.target.value)}
-                  placeholder="np. Moja okolica, Praca, Park"
+                  value={areaName}
+                  onChange={(e) => setAreaName(e.target.value)}
+                  placeholder="np. Mój rewir, Okolica biura, Park"
                   className="min-h-11 px-3 rounded-[var(--radius-card)] border border-black/10 text-sm"
                 />
               </label>
 
               <div>
-                <LocationPicker
-                  value={{ lat, lng }}
-                  onChange={(pt) => {
-                    setLat(pt.lat)
-                    setLng(pt.lng)
-                  }}
-                  radiusM={radiusM}
-                  onRadiusChange={setRadiusM}
-                  minRadius={50}
-                  maxRadius={2000}
+                <PolygonPicker
+                  points={polygonPoints}
+                  onChange={setPolygonPoints}
                   onGetGps={handleGps}
                   locating={locating}
                   accentColor="#176B4B"
-                  label="Wskaż środek okolicy na mapie"
-                  hint="Kliknij na mapie, aby ustawić centrum. Użyj suwaka poniżej, aby dobrać promień."
+                  label="Wyznacz wierzchołki na mapie"
+                  hint="Klikaj na mapie, aby ustawić do 4 wierzchołków. Min. 3 dla trójkąta, max. 4 dla czworokąta."
                 />
               </div>
-
-              {/* Hidden inputs to preserve form semantics */}
-              <input type="hidden" name="lat" value={lat} />
-              <input type="hidden" name="lng" value={lng} />
-              <input type="hidden" name="radiusM" value={radiusM} />
             </div>
           )}
 
@@ -394,7 +450,7 @@ export function AreasScreen({ draftPoint }: AreasScreenProps) {
             <button
               type="button"
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || (formKind === 'polygon' && polygonPoints.length < 3)}
               className="min-h-10 px-5 rounded-[var(--radius-card)] border-0 text-white text-xs font-semibold cursor-pointer transition-opacity hover:opacity-90 shadow-sm disabled:opacity-50 inline-flex items-center gap-1.5"
               style={{ background: 'var(--color-action)' }}
             >
@@ -418,13 +474,13 @@ export function AreasScreen({ draftPoint }: AreasScreenProps) {
       {/* Empty State */}
       {areas.length === 0 ? (
         <div className="text-center py-8 px-4 rounded-[var(--radius-card)] bg-white border border-dashed border-black/15 shadow-xs">
-          <MapPin size={32} className="mx-auto text-[var(--color-text)]/30 mb-2" />
+          <Shapes size={32} className="mx-auto text-[var(--color-text)]/30 mb-2" />
           <p className="m-0 font-medium text-sm text-[var(--color-text)]">
             Brak zapisanych okolic
           </p>
           <p className="mt-1 mb-4 text-xs text-[var(--color-text)]/60 max-w-sm mx-auto">
-            Dodaj punkty z promieniem lub całe dzielnice, aby filtrować mapę i widzieć to, co
-            dzieje się blisko Ciebie.
+            Wyznacz na mapie wielokąty (maksymalnie czworokąty) lub całe dzielnice, aby filtrować
+            pomysły i usterki.
           </p>
           {!isFormOpen && (
             <button
@@ -439,71 +495,88 @@ export function AreasScreen({ draftPoint }: AreasScreenProps) {
         </div>
       ) : (
         <ul className="m-0 p-0 list-none space-y-2">
-          {areas.map((area) => (
-            <li
-              key={area.id}
-              className={`flex items-center justify-between gap-3 border rounded-[var(--radius-card)] bg-white px-4 py-3 transition-all ${
-                editingArea?.id === area.id
-                  ? 'border-[var(--color-action)] ring-2 ring-[var(--color-action)]/20 shadow-xs'
-                  : justUpdatedId === area.id
-                    ? 'border-emerald-400 bg-emerald-50/40'
-                    : 'border-black/5 hover:border-black/10'
-              }`}
-            >
-              <div className="flex items-start gap-3 min-w-0">
-                <div
-                  className="mt-0.5 p-2 rounded-lg shrink-0"
-                  style={{
-                    background:
-                      area.kind === 'district' ? 'var(--color-ideas)/10' : 'var(--color-action)/10',
-                    color:
-                      area.kind === 'district' ? 'var(--color-ideas)' : 'var(--color-action)',
-                  }}
-                >
-                  {area.kind === 'district' ? <Building2 size={16} /> : <MapPin size={16} />}
-                </div>
-                <div className="min-w-0">
-                  <p className="m-0 font-medium text-sm text-[var(--color-text)] truncate">
-                    {area.name}
-                  </p>
-                  <p className="m-0 text-xs text-[var(--color-text)]/60 truncate">
-                    {area.kind === 'district'
-                      ? `Dzielnica: ${area.district_code}`
-                      : `Promień ${area.radius_m} m · ${area.lat?.toFixed(4)}, ${area.lng?.toFixed(4)}`}
-                  </p>
-                </div>
-              </div>
+          {areas.map((area) => {
+            const isPolygon =
+              area.kind === 'polygon' ||
+              Boolean(area.polygon_points && area.polygon_points.length >= 3)
+            const vertexCount = area.polygon_points?.length ?? (area.kind === 'radius' ? 4 : 0)
 
-              <div className="flex items-center gap-1 shrink-0">
-                <button
-                  type="button"
-                  aria-label="Edytuj okolicę"
-                  title="Edytuj okolicę"
-                  onClick={() => startEditing(area)}
-                  className="p-2 rounded-lg border border-black/10 bg-white hover:bg-black/5 text-[var(--color-text)]/75 hover:text-[var(--color-text)] cursor-pointer transition-colors inline-flex items-center gap-1 text-xs"
-                >
-                  <Pencil size={15} />
-                  <span className="hidden sm:inline font-medium">Edytuj</span>
-                </button>
-                <button
-                  type="button"
-                  aria-label="Usuń okolicę"
-                  title="Usuń okolicę"
-                  onClick={async () => {
-                    if (editingArea?.id === area.id) {
-                      cancelForm()
-                    }
-                    await deleteInterestArea(area.id, user.id)
-                    setSuccessMessage(`Usunięto okolicę: ${area.name}`)
-                    await refresh()
-                  }}
-                  className="p-2 rounded-lg border border-black/10 bg-white hover:bg-rose-50 text-[var(--color-text)]/75 hover:text-rose-600 hover:border-rose-200 cursor-pointer transition-colors inline-flex items-center gap-1 text-xs"
-                >
-                  <Trash2 size={15} />
-                </button>
-              </div>
-            </li>
-          ))}
+            return (
+              <li
+                key={area.id}
+                className={`flex items-center justify-between gap-3 border rounded-[var(--radius-card)] bg-white px-4 py-3 transition-all ${
+                  editingArea?.id === area.id
+                    ? 'border-[var(--color-action)] ring-2 ring-[var(--color-action)]/20 shadow-xs'
+                    : justUpdatedId === area.id
+                      ? 'border-emerald-400 bg-emerald-50/40'
+                      : 'border-black/5 hover:border-black/10'
+                }`}
+              >
+                <div className="flex items-start gap-3 min-w-0">
+                  <div
+                    className="mt-0.5 p-2 rounded-lg shrink-0"
+                    style={{
+                      background:
+                        area.kind === 'district'
+                          ? 'var(--color-ideas)/10'
+                          : 'var(--color-action)/10',
+                      color:
+                        area.kind === 'district'
+                          ? 'var(--color-ideas)'
+                          : 'var(--color-action)',
+                    }}
+                  >
+                    {area.kind === 'district' ? (
+                      <Building2 size={16} />
+                    ) : (
+                      <Shapes size={16} />
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="m-0 font-medium text-sm text-[var(--color-text)] truncate">
+                      {area.name}
+                    </p>
+                    <p className="m-0 text-xs text-[var(--color-text)]/60 truncate">
+                      {area.kind === 'district'
+                        ? `Dzielnica: ${area.district_code}`
+                        : isPolygon
+                          ? `Wielokąt · ${vertexCount} ${vertexCount === 4 ? 'wierzchołki (czworokąt)' : 'wierzchołki'}`
+                          : `Okolica punktowa · ${area.lat?.toFixed(4)}, ${area.lng?.toFixed(4)}`}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    aria-label="Edytuj okolicę"
+                    title="Edytuj okolicę"
+                    onClick={() => startEditing(area)}
+                    className="p-2 rounded-lg border border-black/10 bg-white hover:bg-black/5 text-[var(--color-text)]/75 hover:text-[var(--color-text)] cursor-pointer transition-colors inline-flex items-center gap-1 text-xs"
+                  >
+                    <Pencil size={15} />
+                    <span className="hidden sm:inline font-medium">Edytuj</span>
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Usuń okolicę"
+                    title="Usuń okolicę"
+                    onClick={async () => {
+                      if (editingArea?.id === area.id) {
+                        cancelForm()
+                      }
+                      await deleteInterestArea(area.id, user.id)
+                      setSuccessMessage(`Usunięto okolicę: ${area.name}`)
+                      await refresh()
+                    }}
+                    className="p-2 rounded-lg border border-black/10 bg-white hover:bg-rose-50 text-[var(--color-text)]/75 hover:text-rose-600 hover:border-rose-200 cursor-pointer transition-colors inline-flex items-center gap-1 text-xs"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              </li>
+            )
+          })}
         </ul>
       )}
     </div>
