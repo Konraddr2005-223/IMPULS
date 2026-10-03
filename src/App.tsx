@@ -1,9 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
+import { ApplicationEditor } from './applications/ApplicationEditor'
+import { generateAndSaveApplication } from './applications/api'
+import type { ApplicationRecord } from './applications/types'
 import { AuthBar } from './auth/AuthBar'
 import { useAuth } from './auth/AuthContext'
 import { krakowAdapter } from './city'
 import type { LandAssessment } from './city/types'
+import { probeWmsSources, type WmsProbeResult } from './city/wms'
+import type { CommentRecord } from './comments/api'
 import { DEMO_DISCLAIMER, demoFaults, demoIdeas } from './data/demoContent'
+import { CreateFaultForm } from './faults/CreateFaultForm'
+import { FAULT_STATUS_LABELS, fetchFaults } from './faults/api'
+import type { FaultRecord } from './faults/types'
 import { CreateIdeaForm } from './ideas/CreateIdeaForm'
 import { IdeaDetailCard } from './ideas/IdeaDetailCard'
 import { fetchPublishedIdeas } from './ideas/api'
@@ -17,6 +25,7 @@ import { brand } from './theme/tokens'
 type TabId = 'mapa' | 'dodaj' | 'powiadomienia' | 'moje'
 type MapLayer = 'pomysly' | 'usterki'
 type MapMode = 'mapa' | 'lista'
+type AddKind = 'idea' | 'fault'
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'mapa', label: 'Mapa' },
@@ -28,6 +37,7 @@ const TABS: { id: TabId; label: string }[] = [
 function App() {
   const { user, displayName } = useAuth()
   const [tab, setTab] = useState<TabId>('mapa')
+  const [addKind, setAddKind] = useState<AddKind>('idea')
   const [layer, setLayer] = useState<MapLayer>('pomysly')
   const [mode, setMode] = useState<MapMode>('mapa')
   const [land, setLand] = useState<LandAssessment | null>(null)
@@ -39,8 +49,12 @@ function App() {
   const [ideas, setIdeas] = useState<IdeaRecord[]>([])
   const [ideasSource, setIdeasSource] = useState<'db' | 'demo'>('demo')
   const [ideasError, setIdeasError] = useState<string | null>(null)
+  const [faults, setFaults] = useState<FaultRecord[]>([])
+  const [faultsSource, setFaultsSource] = useState<'db' | 'demo'>('demo')
   const [selectedIdeaId, setSelectedIdeaId] = useState<string | null>(null)
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set())
+  const [application, setApplication] = useState<ApplicationRecord | null>(null)
+  const [wmsStatus, setWmsStatus] = useState<WmsProbeResult[] | null>(null)
 
   async function loadIdeas() {
     if (!isSupabaseConfigured) {
@@ -60,8 +74,28 @@ function App() {
     }
   }
 
+  async function loadFaults() {
+    if (!isSupabaseConfigured) {
+      setFaults([])
+      setFaultsSource('demo')
+      return
+    }
+    try {
+      const rows = await fetchFaults()
+      setFaults(rows)
+      setFaultsSource(rows.length > 0 ? 'db' : 'demo')
+    } catch {
+      setFaults([])
+      setFaultsSource('demo')
+    }
+  }
+
   useEffect(() => {
     void loadIdeas()
+    void loadFaults()
+    void probeWmsSources(3500)
+      .then(setWmsStatus)
+      .catch(() => setWmsStatus(null))
   }, [])
 
   useEffect(() => {
@@ -102,9 +136,45 @@ function App() {
     await loadIdeas()
   }
 
+  async function handleGenerate(idea: IdeaRecord, comments: CommentRecord[]) {
+    if (!user) throw new Error('Wymagane logowanie.')
+    const landNote = land
+      ? `Ocena terenu (demo): ${land.assessment}${land.scenarioDescription ? ` — ${land.scenarioDescription}` : ''}`
+      : undefined
+    const doc = await generateAndSaveApplication({
+      idea,
+      authorId: user.id,
+      selectedComments: comments.map((c) => ({ id: c.id, body: c.body })),
+      costItems: [
+        { catalogId: 'bench_backrest_installation', quantity: 2 },
+        { catalogId: 'tree_16_18_planting', quantity: 4 },
+      ],
+      landNote,
+    })
+    setApplication(doc)
+    setTab('moje')
+  }
+
   const listIdeas = ideasSource === 'db' ? ideas : null
+  const listFaults = faultsSource === 'db' ? faults : null
   const selectedIdea =
     listIdeas?.find((idea) => idea.id === selectedIdeaId) ?? null
+
+  if (application) {
+    return (
+      <div className="min-h-svh flex flex-col">
+        <header className="shrink-0 px-4 py-3 border-b border-black/5 bg-white/90">
+          <div className="mx-auto max-w-6xl flex items-center justify-between">
+            <h1 className="text-xl font-semibold m-0" style={{ color: 'var(--color-ideas)' }}>
+              {brand.name}
+            </h1>
+            <AuthBar />
+          </div>
+        </header>
+        <ApplicationEditor application={application} onClose={() => setApplication(null)} />
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-svh flex flex-col">
@@ -131,14 +201,20 @@ function App() {
             landLoading={landLoading}
             landError={landError}
             ideas={listIdeas}
+            faults={listFaults}
             ideasSource={ideasSource}
+            faultsSource={faultsSource}
             ideasError={ideasError}
+            wmsStatus={wmsStatus}
             selectedIdea={selectedIdea}
             likedIds={likedIds}
-            canLike={Boolean(user)}
+            userId={user?.id ?? null}
             onLayerChange={setLayer}
             onModeChange={setMode}
-            onAdd={() => setTab('dodaj')}
+            onAdd={() => {
+              setAddKind(layer === 'usterki' ? 'fault' : 'idea')
+              setTab('dodaj')
+            }}
             onMapClick={handleMapClick}
             onSelectIdea={(id) => {
               setSelectedIdeaId(id)
@@ -154,13 +230,32 @@ function App() {
             onCheckLandForIdea={(idea) => {
               void handleMapClick({ lat: idea.lat, lng: idea.lng })
             }}
+            onGenerate={(comments) =>
+              selectedIdea
+                ? handleGenerate(selectedIdea, comments)
+                : Promise.reject(new Error('Brak pomysłu'))
+            }
+            onThresholdSaved={() => void loadIdeas()}
           />
         )}
-        {tab === 'dodaj' && (
+        {tab === 'dodaj' && addKind === 'idea' && (
           <CreateIdeaForm
             initialPoint={draftPoint}
+            onSwitchToFault={() => setAddKind('fault')}
             onCreated={() => {
               void loadIdeas()
+              setLayer('pomysly')
+              setTab('mapa')
+            }}
+          />
+        )}
+        {tab === 'dodaj' && addKind === 'fault' && (
+          <CreateFaultForm
+            initialPoint={draftPoint}
+            onSwitchToIdea={() => setAddKind('idea')}
+            onCreated={() => {
+              void loadFaults()
+              setLayer('usterki')
               setTab('mapa')
             }}
           />
@@ -168,7 +263,7 @@ function App() {
         {tab === 'powiadomienia' && (
           <PlaceholderScreen
             title="Powiadomienia"
-            body="Zdarzenia z okolicy i statusy zgłoszeń."
+            body="Zapis w bazie i polling od godziny 6–7. Na razie ekran zastępczy."
           />
         )}
         {tab === 'moje' && (
@@ -176,8 +271,8 @@ function App() {
             title="Moje"
             body={
               user
-                ? `Zalogowano jako ${displayName ?? user.email}. Twoje pomysły i dokumenty pojawią się tutaj.`
-                : 'Zaloguj się kontem prezentacyjnym (Autor / Sąsiad w nagłówku), aby zarządzać wpisami.'
+                ? `Zalogowano jako ${displayName ?? user.email}. Wniosek BO otwiera się po wygenerowaniu z karty pomysłu.`
+                : 'Zaloguj się kontem prezentacyjnym (Autor / Sąsiad), aby zarządzać wpisami.'
             }
           />
         )}
@@ -237,11 +332,14 @@ type MapScreenProps = {
   landLoading: boolean
   landError: string | null
   ideas: IdeaRecord[] | null
+  faults: FaultRecord[] | null
   ideasSource: 'db' | 'demo'
+  faultsSource: 'db' | 'demo'
   ideasError: string | null
+  wmsStatus: WmsProbeResult[] | null
   selectedIdea: IdeaRecord | null
   likedIds: Set<string>
-  canLike: boolean
+  userId: string | null
   onLayerChange: (layer: MapLayer) => void
   onModeChange: (mode: MapMode) => void
   onAdd: () => void
@@ -251,6 +349,8 @@ type MapScreenProps = {
   onLikeToggle: (ideaId: string, liked: boolean) => Promise<void>
   onCloseLand: () => void
   onCheckLandForIdea: (idea: IdeaRecord) => void
+  onGenerate: (comments: CommentRecord[]) => Promise<void>
+  onThresholdSaved: () => void
 }
 
 function MapScreen({
@@ -260,11 +360,14 @@ function MapScreen({
   landLoading,
   landError,
   ideas,
+  faults,
   ideasSource,
+  faultsSource,
   ideasError,
+  wmsStatus,
   selectedIdea,
   likedIds,
-  canLike,
+  userId,
   onLayerChange,
   onModeChange,
   onAdd,
@@ -274,6 +377,8 @@ function MapScreen({
   onLikeToggle,
   onCloseLand,
   onCheckLandForIdea,
+  onGenerate,
+  onThresholdSaved,
 }: MapScreenProps) {
   const markers: MapMarker[] = useMemo(() => {
     if (layer === 'pomysly') {
@@ -294,6 +399,15 @@ function MapScreen({
         label: idea.title,
       }))
     }
+    if (faults) {
+      return faults.map((fault) => ({
+        id: fault.id,
+        lat: fault.lat,
+        lng: fault.lng,
+        kind: 'fault' as const,
+        label: fault.description.slice(0, 40),
+      }))
+    }
     return demoFaults.map((fault) => ({
       id: fault.id,
       lat: fault.lat,
@@ -301,7 +415,13 @@ function MapScreen({
       kind: 'fault' as const,
       label: fault.title,
     }))
-  }, [layer, ideas])
+  }, [layer, ideas, faults])
+
+  const wmsLine = wmsStatus
+    ? wmsStatus
+        .map((s) => `${s.id}:${s.ok ? 'ok' : s.timedOut ? 'timeout' : 'fail'}`)
+        .join(', ')
+    : 'WMS: …'
 
   return (
     <div className="flex-1 min-h-0 flex flex-col">
@@ -352,10 +472,8 @@ function MapScreen({
 
       <p className="m-0 px-3 py-1.5 text-xs text-[var(--color-text)]/60 bg-[var(--color-bg)] border-b border-black/5">
         {DEMO_DISCLAIMER}
-        {isSupabaseConfigured ? ' · Supabase: OK' : ' · Supabase: brak konfiguracji'}
-        {` · Źródło pomysłów: ${ideasSource === 'db' ? 'baza' : 'dane lokalne'}`}
+        {` · Pomysły: ${ideasSource} · Usterki: ${faultsSource} · ${wmsLine}`}
         {ideasError ? ` · ${ideasError}` : ''}
-        {' · Kliknij mapę, aby sprawdzić teren (dane demo).'}
       </p>
 
       <div className="flex-1 min-h-0 grid md:grid-cols-[minmax(260px,340px)_1fr]">
@@ -398,14 +516,23 @@ function MapScreen({
             </ul>
           ) : (
             <ul className="m-0 p-0 list-none">
-              {demoFaults.map((fault) => (
-                <li key={fault.id} className="border-b border-black/5 px-4 py-3">
-                  <p className="m-0 font-medium">{fault.title}</p>
-                  <p className="m-0 mt-1 text-sm text-[var(--color-text)]/65">
-                    {fault.status}
-                  </p>
-                </li>
-              ))}
+              {faults
+                ? faults.map((fault) => (
+                    <li key={fault.id} className="border-b border-black/5 px-4 py-3">
+                      <p className="m-0 font-medium">{fault.description}</p>
+                      <p className="m-0 mt-1 text-sm text-[var(--color-text)]/65">
+                        {FAULT_STATUS_LABELS[fault.status] ?? fault.status}
+                      </p>
+                    </li>
+                  ))
+                : demoFaults.map((fault) => (
+                    <li key={fault.id} className="border-b border-black/5 px-4 py-3">
+                      <p className="m-0 font-medium">{fault.title}</p>
+                      <p className="m-0 mt-1 text-sm text-[var(--color-text)]/65">
+                        {fault.status}
+                      </p>
+                    </li>
+                  ))}
             </ul>
           )}
         </aside>
@@ -430,10 +557,14 @@ function MapScreen({
             <IdeaDetailCard
               idea={selectedIdea}
               liked={likedIds.has(selectedIdea.id)}
-              canLike={canLike}
+              canLike={Boolean(userId)}
+              isAuthor={Boolean(userId && userId === selectedIdea.author_id)}
+              userId={userId}
               onLikeToggle={(liked) => onLikeToggle(selectedIdea.id, liked)}
               onClose={onCloseIdea}
               onCheckLand={() => onCheckLandForIdea(selectedIdea)}
+              onGenerate={onGenerate}
+              onThresholdSaved={onThresholdSaved}
             />
           ) : (
             <LandCard

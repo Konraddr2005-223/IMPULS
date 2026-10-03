@@ -9,9 +9,14 @@ import type { IdeaRecord } from './types'
 type CreateIdeaFormProps = {
   initialPoint?: { lat: number; lng: number } | null
   onCreated: (idea: IdeaRecord) => void
+  onSwitchToFault?: () => void
 }
 
-export function CreateIdeaForm({ initialPoint, onCreated }: CreateIdeaFormProps) {
+export function CreateIdeaForm({
+  initialPoint,
+  onCreated,
+  onSwitchToFault,
+}: CreateIdeaFormProps) {
   const { user, loading: authLoading, error: authError, signInDemo, clearError } =
     useAuth()
 
@@ -93,9 +98,21 @@ export function CreateIdeaForm({ initialPoint, onCreated }: CreateIdeaFormProps)
         className="rounded-[var(--radius-card)] bg-white p-5 border border-black/5"
         aria-labelledby="create-idea-heading"
       >
-        <h2 id="create-idea-heading" className="m-0 text-lg font-semibold">
-          Dodaj pomysł
-        </h2>
+        <div className="flex items-baseline justify-between gap-2">
+          <h2 id="create-idea-heading" className="m-0 text-lg font-semibold">
+            Dodaj pomysł
+          </h2>
+          {onSwitchToFault && (
+            <button
+              type="button"
+              onClick={onSwitchToFault}
+              className="border-0 bg-transparent cursor-pointer text-sm"
+              style={{ color: 'var(--color-faults)' }}
+            >
+              Przełącz na usterkę
+            </button>
+          )}
+        </div>
         <p className="mt-2 mb-4 text-sm text-[var(--color-text)]/70">
           Fikcyjny wpis demonstracyjny. Nie zgłaszaj rzeczywistych problemów lokalnych
           bez kontekstu prezentacji.

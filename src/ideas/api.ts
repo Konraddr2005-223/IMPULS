@@ -23,6 +23,23 @@ export async function fetchPublishedIdeas(): Promise<IdeaRecord[]> {
   )
 }
 
+export async function updateSupportThreshold(
+  ideaId: string,
+  authorId: string,
+  supportThreshold: number,
+): Promise<void> {
+  if (!supabase) throw new Error('Supabase nie jest skonfigurowany.')
+  if (supportThreshold < 1 || supportThreshold > 50) {
+    throw new Error('Próg musi być w zakresie 1–50.')
+  }
+  const { error } = await supabase
+    .from('ideas')
+    .update({ support_threshold: supportThreshold })
+    .eq('id', ideaId)
+    .eq('author_id', authorId)
+  if (error) throw error
+}
+
 export async function createIdea(
   authorId: string,
   input: CreateIdeaInput,
