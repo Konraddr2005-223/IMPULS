@@ -1,12 +1,14 @@
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { ApplicationEditor } from './applications/ApplicationEditor'
 import { generateAndSaveApplication } from './applications/api'
 import type { ApplicationRecord } from './applications/types'
+import { AreasScreen } from './areas/AreasScreen'
+import { ideaMatchesAreas, listInterestAreas } from './areas/api'
 import { AuthBar } from './auth/AuthBar'
 import { useAuth } from './auth/AuthContext'
-import { krakowAdapter } from './city'
+import { checkLand } from './city/checkLand'
 import type { LandAssessment } from './city/types'
-import { probeWmsSources, type WmsProbeResult } from './city/wms'
 import type { CommentRecord } from './comments/api'
 import { DEMO_DISCLAIMER, demoFaults, demoIdeas } from './data/demoContent'
 import { CreateFaultForm } from './faults/CreateFaultForm'
@@ -17,15 +19,20 @@ import { IdeaDetailCard } from './ideas/IdeaDetailCard'
 import { fetchPublishedIdeas } from './ideas/api'
 import { fetchMyLikedIdeaIds, setLike } from './ideas/likes'
 import type { IdeaRecord } from './ideas/types'
+import { useOnline } from './lib/online'
 import { isSupabaseConfigured } from './lib/supabase'
 import { LandCard } from './map/LandCard'
-import { MapCanvas, type MapMarker } from './map/MapCanvas'
+import { MapCanvas, type MapCircle, type MapMarker } from './map/MapCanvas'
+import { MyScreen } from './me/MyScreen'
+import { NotificationsScreen } from './notifications/NotificationsScreen'
 import { brand } from './theme/tokens'
+import { copy } from './ui/copy'
 
 type TabId = 'mapa' | 'dodaj' | 'powiadomienia' | 'moje'
 type MapLayer = 'pomysly' | 'usterki'
 type MapMode = 'mapa' | 'lista'
 type AddKind = 'idea' | 'fault'
+type MojeView = 'home' | 'areas'
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'mapa', label: 'Mapa' },
@@ -36,77 +43,59 @@ const TABS: { id: TabId; label: string }[] = [
 
 function App() {
   const { user, displayName } = useAuth()
+  const online = useOnline()
+  const qc = useQueryClient()
   const [tab, setTab] = useState<TabId>('mapa')
   const [addKind, setAddKind] = useState<AddKind>('idea')
+  const [mojeView, setMojeView] = useState<MojeView>('home')
   const [layer, setLayer] = useState<MapLayer>('pomysly')
   const [mode, setMode] = useState<MapMode>('mapa')
+  const [filterByAreas, setFilterByAreas] = useState(false)
   const [land, setLand] = useState<LandAssessment | null>(null)
   const [landLoading, setLandLoading] = useState(false)
   const [landError, setLandError] = useState<string | null>(null)
   const [draftPoint, setDraftPoint] = useState<{ lat: number; lng: number } | null>(
     null,
   )
-  const [ideas, setIdeas] = useState<IdeaRecord[]>([])
-  const [ideasSource, setIdeasSource] = useState<'db' | 'demo'>('demo')
-  const [ideasError, setIdeasError] = useState<string | null>(null)
-  const [faults, setFaults] = useState<FaultRecord[]>([])
-  const [faultsSource, setFaultsSource] = useState<'db' | 'demo'>('demo')
   const [selectedIdeaId, setSelectedIdeaId] = useState<string | null>(null)
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set())
   const [application, setApplication] = useState<ApplicationRecord | null>(null)
-  const [wmsStatus, setWmsStatus] = useState<WmsProbeResult[] | null>(null)
 
-  async function loadIdeas() {
-    if (!isSupabaseConfigured) {
-      setIdeas([])
-      setIdeasSource('demo')
-      return
-    }
-    try {
-      const rows = await fetchPublishedIdeas()
-      setIdeas(rows)
-      setIdeasSource(rows.length > 0 ? 'db' : 'demo')
-      setIdeasError(null)
-    } catch (err) {
-      setIdeas([])
-      setIdeasSource('demo')
-      setIdeasError(err instanceof Error ? err.message : 'Błąd odczytu pomysłów')
-    }
-  }
+  const ideasQuery = useQuery({
+    queryKey: ['ideas'],
+    queryFn: fetchPublishedIdeas,
+    enabled: isSupabaseConfigured,
+  })
+  const faultsQuery = useQuery({
+    queryKey: ['faults'],
+    queryFn: fetchFaults,
+    enabled: isSupabaseConfigured,
+  })
+  const areasQuery = useQuery({
+    queryKey: ['areas', user?.id],
+    queryFn: () => listInterestAreas(user!.id),
+    enabled: Boolean(user),
+  })
+  const likesQuery = useQuery({
+    queryKey: ['liked', user?.id],
+    queryFn: () => fetchMyLikedIdeaIds(user!.id),
+    enabled: Boolean(user),
+  })
 
-  async function loadFaults() {
-    if (!isSupabaseConfigured) {
-      setFaults([])
-      setFaultsSource('demo')
-      return
-    }
-    try {
-      const rows = await fetchFaults()
-      setFaults(rows)
-      setFaultsSource(rows.length > 0 ? 'db' : 'demo')
-    } catch {
-      setFaults([])
-      setFaultsSource('demo')
-    }
-  }
+  const ideas = ideasQuery.data ?? []
+  const faults = faultsQuery.data ?? []
+  const areas = areasQuery.data ?? []
+  const ideasFromDb = ideas.length > 0
+  const faultsFromDb = faults.length > 0
 
   useEffect(() => {
-    void loadIdeas()
-    void loadFaults()
-    void probeWmsSources(3500)
-      .then(setWmsStatus)
-      .catch(() => setWmsStatus(null))
-  }, [])
+    if (likesQuery.data) setLikedIds(likesQuery.data)
+  }, [likesQuery.data])
 
-  useEffect(() => {
-    if (!user) {
-      setLikedIds(new Set())
-      return
-    }
-    void fetchMyLikedIdeaIds(user.id)
-      .then(setLikedIds)
-      .catch(() => setLikedIds(new Set()))
-  }, [user])
+  const filteredIdeas = useMemo(() => {
+    if (!filterByAreas || areas.length === 0) return ideas
+    return ideas.filter((idea) => ideaMatchesAreas(idea, areas))
+  }, [ideas, areas, filterByAreas])
 
   async function handleMapClick(point: { lat: number; lng: number }) {
     setSelectedIdeaId(null)
@@ -114,11 +103,11 @@ function App() {
     setLandLoading(true)
     setLandError(null)
     try {
-      const result = await krakowAdapter.checkLocation(point)
+      const result = await checkLand(point)
       setLand(result)
     } catch {
       setLand(null)
-      setLandError('Nie udało się sprawdzić terenu.')
+      setLandError(copy.landError)
     } finally {
       setLandLoading(false)
     }
@@ -126,20 +115,27 @@ function App() {
 
   async function handleLikeToggle(ideaId: string, liked: boolean) {
     if (!user) throw new Error('Wymagane logowanie.')
-    await setLike(ideaId, user.id, liked)
+    const previous = new Set(likedIds)
     setLikedIds((prev) => {
       const next = new Set(prev)
       if (liked) next.add(ideaId)
       else next.delete(ideaId)
       return next
     })
-    await loadIdeas()
+    try {
+      await setLike(ideaId, user.id, liked)
+      await qc.invalidateQueries({ queryKey: ['ideas'] })
+      await qc.invalidateQueries({ queryKey: ['notifications', user.id] })
+    } catch (err) {
+      setLikedIds(previous)
+      throw err
+    }
   }
 
   async function handleGenerate(idea: IdeaRecord, comments: CommentRecord[]) {
     if (!user) throw new Error('Wymagane logowanie.')
     const landNote = land
-      ? `Ocena terenu (demo): ${land.assessment}${land.scenarioDescription ? ` — ${land.scenarioDescription}` : ''}`
+      ? `Ocena terenu: ${land.assessment}${land.scenarioDescription ? ` — ${land.scenarioDescription}` : ''}`
       : undefined
     const doc = await generateAndSaveApplication({
       idea,
@@ -152,13 +148,10 @@ function App() {
       landNote,
     })
     setApplication(doc)
-    setTab('moje')
   }
 
-  const listIdeas = ideasSource === 'db' ? ideas : null
-  const listFaults = faultsSource === 'db' ? faults : null
   const selectedIdea =
-    listIdeas?.find((idea) => idea.id === selectedIdeaId) ?? null
+    filteredIdeas.find((idea) => idea.id === selectedIdeaId) ?? null
 
   if (application) {
     return (
@@ -171,7 +164,11 @@ function App() {
             <AuthBar />
           </div>
         </header>
-        <ApplicationEditor application={application} onClose={() => setApplication(null)} />
+        <ApplicationEditor
+          application={application}
+          ideaTitle={selectedIdea?.title}
+          onClose={() => setApplication(null)}
+        />
       </div>
     )
   }
@@ -186,6 +183,7 @@ function App() {
             </h1>
             <p className="m-0 text-sm text-[var(--color-text)]/70 hidden sm:block">
               {brand.tagline}
+              {!online ? ` · ${copy.offlineDraft}` : ''}
             </p>
           </div>
           <AuthBar />
@@ -200,15 +198,16 @@ function App() {
             land={land}
             landLoading={landLoading}
             landError={landError}
-            ideas={listIdeas}
-            faults={listFaults}
-            ideasSource={ideasSource}
-            faultsSource={faultsSource}
-            ideasError={ideasError}
-            wmsStatus={wmsStatus}
+            ideas={ideasFromDb ? filteredIdeas : null}
+            faults={faultsFromDb ? faults : null}
+            areas={areas}
+            filterByAreas={filterByAreas}
+            ideasSource={ideasFromDb ? 'db' : 'demo'}
+            faultsSource={faultsFromDb ? 'db' : 'demo'}
             selectedIdea={selectedIdea}
             likedIds={likedIds}
             userId={user?.id ?? null}
+            onFilterByAreasChange={setFilterByAreas}
             onLayerChange={setLayer}
             onModeChange={setMode}
             onAdd={() => {
@@ -235,7 +234,7 @@ function App() {
                 ? handleGenerate(selectedIdea, comments)
                 : Promise.reject(new Error('Brak pomysłu'))
             }
-            onThresholdSaved={() => void loadIdeas()}
+            onThresholdSaved={() => void qc.invalidateQueries({ queryKey: ['ideas'] })}
           />
         )}
         {tab === 'dodaj' && addKind === 'idea' && (
@@ -243,7 +242,7 @@ function App() {
             initialPoint={draftPoint}
             onSwitchToFault={() => setAddKind('fault')}
             onCreated={() => {
-              void loadIdeas()
+              void qc.invalidateQueries({ queryKey: ['ideas'] })
               setLayer('pomysly')
               setTab('mapa')
             }}
@@ -254,27 +253,31 @@ function App() {
             initialPoint={draftPoint}
             onSwitchToIdea={() => setAddKind('idea')}
             onCreated={() => {
-              void loadFaults()
+              void qc.invalidateQueries({ queryKey: ['faults'] })
               setLayer('usterki')
               setTab('mapa')
             }}
           />
         )}
-        {tab === 'powiadomienia' && (
-          <PlaceholderScreen
-            title="Powiadomienia"
-            body="Zapis w bazie i polling od godziny 6–7. Na razie ekran zastępczy."
+        {tab === 'powiadomienia' && <NotificationsScreen />}
+        {tab === 'moje' && mojeView === 'home' && (
+          <MyScreen
+            onOpenAreas={() => setMojeView('areas')}
+            onOpenApplication={(app) => setApplication(app)}
           />
         )}
-        {tab === 'moje' && (
-          <PlaceholderScreen
-            title="Moje"
-            body={
-              user
-                ? `Zalogowano jako ${displayName ?? user.email}. Wniosek BO otwiera się po wygenerowaniu z karty pomysłu.`
-                : 'Zaloguj się kontem prezentacyjnym (Autor / Sąsiad), aby zarządzać wpisami.'
-            }
-          />
+        {tab === 'moje' && mojeView === 'areas' && (
+          <div className="flex-1 min-h-0 flex flex-col">
+            <button
+              type="button"
+              className="self-start m-3 text-sm border-0 bg-transparent cursor-pointer"
+              style={{ color: 'var(--color-action)' }}
+              onClick={() => setMojeView('home')}
+            >
+              ← Wróć do Moje
+            </button>
+            <AreasScreen draftPoint={draftPoint} />
+          </div>
         )}
       </main>
 
@@ -283,7 +286,15 @@ function App() {
         aria-label="Nawigacja dolna"
       >
         {TABS.map(({ id, label }) => (
-          <NavButton key={id} label={label} active={tab === id} onClick={() => setTab(id)} />
+          <NavButton
+            key={id}
+            label={label}
+            active={tab === id}
+            onClick={() => {
+              setTab(id)
+              if (id === 'moje') setMojeView('home')
+            }}
+          />
         ))}
       </nav>
 
@@ -292,9 +303,18 @@ function App() {
         aria-label="Nawigacja"
       >
         {TABS.map(({ id, label }) => (
-          <NavButton key={id} label={label} active={tab === id} onClick={() => setTab(id)} />
+          <NavButton
+            key={id}
+            label={label}
+            active={tab === id}
+            onClick={() => {
+              setTab(id)
+              if (id === 'moje') setMojeView('home')
+            }}
+          />
         ))}
       </nav>
+      {displayName ? null : null}
     </div>
   )
 }
@@ -333,13 +353,14 @@ type MapScreenProps = {
   landError: string | null
   ideas: IdeaRecord[] | null
   faults: FaultRecord[] | null
+  areas: { id: string; lat: number | null; lng: number | null; radius_m: number | null; kind: string }[]
+  filterByAreas: boolean
   ideasSource: 'db' | 'demo'
   faultsSource: 'db' | 'demo'
-  ideasError: string | null
-  wmsStatus: WmsProbeResult[] | null
   selectedIdea: IdeaRecord | null
   likedIds: Set<string>
   userId: string | null
+  onFilterByAreasChange: (v: boolean) => void
   onLayerChange: (layer: MapLayer) => void
   onModeChange: (mode: MapMode) => void
   onAdd: () => void
@@ -361,13 +382,14 @@ function MapScreen({
   landError,
   ideas,
   faults,
+  areas,
+  filterByAreas,
   ideasSource,
   faultsSource,
-  ideasError,
-  wmsStatus,
   selectedIdea,
   likedIds,
   userId,
+  onFilterByAreasChange,
   onLayerChange,
   onModeChange,
   onAdd,
@@ -380,6 +402,11 @@ function MapScreen({
   onGenerate,
   onThresholdSaved,
 }: MapScreenProps) {
+  const topIdeaIds = useMemo(() => {
+    const list = ideas ?? []
+    return new Set(list.slice(0, 3).map((i) => i.id))
+  }, [ideas])
+
   const markers: MapMarker[] = useMemo(() => {
     if (layer === 'pomysly') {
       if (ideas) {
@@ -389,6 +416,7 @@ function MapScreen({
           lng: idea.lng,
           kind: 'idea' as const,
           label: idea.title,
+          highlight: topIdeaIds.has(idea.id),
         }))
       }
       return demoIdeas.map((idea) => ({
@@ -415,13 +443,26 @@ function MapScreen({
       kind: 'fault' as const,
       label: fault.title,
     }))
-  }, [layer, ideas, faults])
+  }, [layer, ideas, faults, topIdeaIds])
 
-  const wmsLine = wmsStatus
-    ? wmsStatus
-        .map((s) => `${s.id}:${s.ok ? 'ok' : s.timedOut ? 'timeout' : 'fail'}`)
-        .join(', ')
-    : 'WMS: …'
+  const circles: MapCircle[] = useMemo(
+    () =>
+      areas
+        .filter(
+          (a) =>
+            a.kind === 'radius' &&
+            a.lat != null &&
+            a.lng != null &&
+            a.radius_m != null,
+        )
+        .map((a) => ({
+          id: a.id,
+          lat: a.lat!,
+          lng: a.lng!,
+          radiusM: a.radius_m!,
+        })),
+    [areas],
+  )
 
   return (
     <div className="flex-1 min-h-0 flex flex-col">
@@ -446,6 +487,15 @@ function MapScreen({
             Usterki
           </LayerTab>
         </div>
+
+        <label className="inline-flex items-center gap-1 text-xs text-[var(--color-text)]/70">
+          <input
+            type="checkbox"
+            checked={filterByAreas}
+            onChange={(e) => onFilterByAreasChange(e.target.checked)}
+          />
+          Filtr: moje okolice
+        </label>
 
         <div
           className="inline-flex rounded-[var(--radius-card)] bg-[var(--color-bg)] p-1 ml-auto"
@@ -472,8 +522,7 @@ function MapScreen({
 
       <p className="m-0 px-3 py-1.5 text-xs text-[var(--color-text)]/60 bg-[var(--color-bg)] border-b border-black/5">
         {DEMO_DISCLAIMER}
-        {` · Pomysły: ${ideasSource} · Usterki: ${faultsSource} · ${wmsLine}`}
-        {ideasError ? ` · ${ideasError}` : ''}
+        {` · Pomysły: ${ideasSource} · Usterki: ${faultsSource}`}
       </p>
 
       <div className="flex-1 min-h-0 grid md:grid-cols-[minmax(260px,340px)_1fr]">
@@ -483,8 +532,13 @@ function MapScreen({
         >
           {layer === 'pomysly' ? (
             <ul className="m-0 p-0 list-none">
-              {ideas
-                ? ideas.map((idea) => (
+              {ideas ? (
+                ideas.length === 0 ? (
+                  <li className="px-4 py-3 text-sm text-[var(--color-text)]/60">
+                    {copy.emptyIdeas}
+                  </li>
+                ) : (
+                  ideas.map((idea) => (
                     <li key={idea.id} className="border-b border-black/5">
                       <button
                         type="button"
@@ -497,22 +551,25 @@ function MapScreen({
                               : 'transparent',
                         }}
                       >
-                        <p className="m-0 font-medium">{idea.title}</p>
+                        <p className="m-0 font-medium">
+                          {idea.title}
+                          {topIdeaIds.has(idea.id) ? ' · top' : ''}
+                        </p>
                         <p className="m-0 mt-1 text-sm text-[var(--color-text)]/65">
                           {idea.district_code ?? 'Kraków'} · {idea.likes_count}/
-                          {idea.support_threshold} poparć
+                          {idea.support_threshold} · 👍 {idea.likes_count}
                         </p>
                       </button>
                     </li>
                   ))
-                : demoIdeas.map((idea) => (
-                    <li key={idea.id} className="border-b border-black/5 px-4 py-3">
-                      <p className="m-0 font-medium">{idea.title}</p>
-                      <p className="m-0 mt-1 text-sm text-[var(--color-text)]/65">
-                        {idea.district} · {idea.likesCount}/{idea.supportThreshold} poparć
-                      </p>
-                    </li>
-                  ))}
+                )
+              ) : (
+                demoIdeas.map((idea) => (
+                  <li key={idea.id} className="border-b border-black/5 px-4 py-3">
+                    <p className="m-0 font-medium">{idea.title}</p>
+                  </li>
+                ))
+              )}
             </ul>
           ) : (
             <ul className="m-0 p-0 list-none">
@@ -528,9 +585,6 @@ function MapScreen({
                 : demoFaults.map((fault) => (
                     <li key={fault.id} className="border-b border-black/5 px-4 py-3">
                       <p className="m-0 font-medium">{fault.title}</p>
-                      <p className="m-0 mt-1 text-sm text-[var(--color-text)]/65">
-                        {fault.status}
-                      </p>
                     </li>
                   ))}
             </ul>
@@ -544,6 +598,7 @@ function MapScreen({
           <MapCanvas
             className="absolute inset-0 h-full w-full z-0"
             markers={markers}
+            circles={circles}
             onMapClick={onMapClick}
             onMarkerClick={(marker) => {
               if (marker.kind === 'idea' && ideas) {
@@ -640,22 +695,6 @@ function ModeButton({
     >
       {children}
     </button>
-  )
-}
-
-function PlaceholderScreen({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="flex-1 mx-auto w-full max-w-6xl px-4 py-8">
-      <section
-        className="rounded-[var(--radius-card)] bg-white p-6 border border-black/5"
-        aria-labelledby="placeholder-heading"
-      >
-        <h2 id="placeholder-heading" className="m-0 text-lg font-semibold">
-          {title}
-        </h2>
-        <p className="mt-2 mb-0 text-[var(--color-text)]/80">{body}</p>
-      </section>
-    </div>
   )
 }
 

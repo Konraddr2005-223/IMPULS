@@ -42,7 +42,7 @@ export async function updateSupportThreshold(
 
 export async function createIdea(
   authorId: string,
-  input: CreateIdeaInput,
+  input: CreateIdeaInput & { photoPath?: string | null },
 ): Promise<IdeaRecord> {
   if (!supabase) throw new Error('Supabase nie jest skonfigurowany.')
 
@@ -57,6 +57,7 @@ export async function createIdea(
       location: pointWkt(input.lat, input.lng),
       district_code: input.districtCode?.trim() || null,
       support_threshold: input.supportThreshold,
+      photo_path: input.photoPath ?? null,
       status: 'published',
     })
     .select(

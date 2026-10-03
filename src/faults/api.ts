@@ -20,7 +20,7 @@ export async function fetchFaults(): Promise<FaultRecord[]> {
 
 export async function createFault(
   authorId: string,
-  input: CreateFaultInput,
+  input: CreateFaultInput & { photoPath?: string | null },
 ): Promise<FaultRecord> {
   if (!supabase) throw new Error('Supabase nie jest skonfigurowany.')
 
@@ -32,6 +32,7 @@ export async function createFault(
       category: input.category,
       description: input.description.trim(),
       location: pointWkt(input.lat, input.lng),
+      photo_path: input.photoPath ?? null,
       status: 'new',
       status_source: 'author',
     })

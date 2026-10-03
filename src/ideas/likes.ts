@@ -10,6 +10,7 @@ export async function setLike(ideaId: string, userId: string, liked: boolean) {
       { onConflict: 'idea_id,user_id', ignoreDuplicates: true },
     )
     if (error) throw error
+    await supabase.rpc('notify_threshold_reached', { p_idea_id: ideaId })
   } else {
     const { error } = await supabase
       .from('idea_likes')

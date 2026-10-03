@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { addComment, fetchComments, type CommentRecord } from '../comments/api'
+import { publicPhotoUrl } from '../lib/storage'
+import { copy } from '../ui/copy'
 import { updateSupportThreshold } from './api'
 import type { IdeaRecord } from './types'
 
@@ -126,6 +128,13 @@ export function IdeaDetailCard({
       <p className="mt-2 mb-0 text-sm text-[var(--color-text)]/80 whitespace-pre-wrap">
         {idea.description}
       </p>
+      {idea.photo_path && publicPhotoUrl(idea.photo_path) && (
+        <img
+          src={publicPhotoUrl(idea.photo_path)!}
+          alt=""
+          className="mt-3 w-full max-h-48 object-cover rounded-[var(--radius-card)]"
+        />
+      )}
 
       <p className="mt-3 mb-0 text-sm">
         Poparcie: <strong>{idea.likes_count}/{idea.support_threshold}</strong>
@@ -133,8 +142,9 @@ export function IdeaDetailCard({
       </p>
       <p className="mt-1 mb-0 text-xs text-[var(--color-text)]/60">
         Próg ustalony przez autora: {idea.support_threshold} os. To sygnał zainteresowania, nie
-        wymóg urzędu. Lajki nie są podpisami ani głosami w BO.
+        wymóg urzędu.
       </p>
+      <p className="mt-1 mb-0 text-xs text-[var(--color-text)]/60">{copy.likeDisclaimer}</p>
 
       {isAuthor && (
         <div className="mt-3 flex items-end gap-2">

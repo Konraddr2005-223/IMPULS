@@ -1,4 +1,5 @@
 import type { LandAssessment } from '../city/types'
+import { copy } from '../ui/copy'
 
 type LandCardProps = {
   assessment: LandAssessment | null
@@ -36,7 +37,12 @@ export function LandCard({ assessment, loading, error, onClose }: LandCardProps)
       </div>
 
       {loading && <p className="mt-2 mb-0 text-sm">Sprawdzam lokalizację…</p>}
-      {error && <p className="mt-2 mb-0 text-sm" style={{ color: 'var(--color-faults)' }}>{error}</p>}
+      {error && (
+        <p className="mt-2 mb-0 text-sm" style={{ color: 'var(--color-faults)' }}>
+          {error || copy.landError}
+        </p>
+      )}
+      <p className="mt-2 mb-0 text-xs text-[var(--color-text)]/55">{copy.landDisclaimer}</p>
 
       {assessment && !loading && (
         <div className="mt-2 space-y-2 text-sm">

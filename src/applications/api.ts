@@ -23,7 +23,7 @@ export async function fetchLatestApplication(
   const { data, error } = await supabase
     .from('applications')
     .select(
-      'id, idea_id, author_id, idea_revision, template_version, model, prompt_version, input_hash, content_json, generation_status, generation_request_key, summary_published, created_at, updated_at',
+      'id, idea_id, author_id, idea_revision, template_version, model, prompt_version, input_hash, content_json, generation_status, generation_request_key, summary_published, official_project_id, submitted_at, signatures_reported_at, created_at, updated_at',
     )
     .eq('idea_id', ideaId)
     .order('created_at', { ascending: false })
@@ -86,7 +86,7 @@ export async function generateAndSaveApplication(input: {
       summary_published: false,
     })
     .select(
-      'id, idea_id, author_id, idea_revision, template_version, model, prompt_version, input_hash, content_json, generation_status, generation_request_key, summary_published, created_at, updated_at',
+      'id, idea_id, author_id, idea_revision, template_version, model, prompt_version, input_hash, content_json, generation_status, generation_request_key, summary_published, official_project_id, submitted_at, signatures_reported_at, created_at, updated_at',
     )
     .single()
 

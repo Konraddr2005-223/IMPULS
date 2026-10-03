@@ -1,0 +1,150 @@
+{
+  "type": "FeatureCollection",
+  "name": "krakow-demo-locations",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "demo-municipal-1",
+        "ownership_class": "municipal",
+        "planning_label": "ZP",
+        "scenario_description": "Skwer ogólnodostępny — grunt gminny.",
+        "source_mode": "synthetic_demo",
+        "checked_at": "2026-10-03"
+      },
+      "geometry": { "type": "Point", "coordinates": [19.937, 50.0614] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "demo-municipal-2",
+        "ownership_class": "municipal",
+        "planning_label": "US",
+        "scenario_description": "Plac zabaw przy szkole — grunt gminny.",
+        "source_mode": "synthetic_demo",
+        "checked_at": "2026-10-03"
+      },
+      "geometry": { "type": "Point", "coordinates": [19.944, 50.052] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "demo-municipal-3",
+        "ownership_class": "municipal",
+        "planning_label": "KD",
+        "scenario_description": "Pas drogowy — możliwa kolizja z infrastrukturą.",
+        "source_mode": "synthetic_demo",
+        "checked_at": "2026-10-03"
+      },
+      "geometry": { "type": "Point", "coordinates": [19.949, 50.045] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "demo-municipal-4",
+        "ownership_class": "municipal",
+        "planning_label": "ZP",
+        "scenario_description": "Park kieszonkowy — grunt gminny.",
+        "source_mode": "synthetic_demo",
+        "checked_at": "2026-10-03"
+      },
+      "geometry": { "type": "Point", "coordinates": [19.91, 50.07] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "demo-other-1",
+        "ownership_class": "other_or_uncertain",
+        "planning_label": "MW",
+        "scenario_description": "Inny podmiot — wymaga weryfikacji urzędu.",
+        "source_mode": "synthetic_demo",
+        "checked_at": "2026-10-03"
+      },
+      "geometry": { "type": "Point", "coordinates": [19.923, 50.064] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "demo-other-2",
+        "ownership_class": "other_or_uncertain",
+        "planning_label": "U",
+        "scenario_description": "Teren przy budynku — własność niepewna.",
+        "source_mode": "synthetic_demo",
+        "checked_at": "2026-10-03"
+      },
+      "geometry": { "type": "Point", "coordinates": [19.96, 50.055] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "demo-other-3",
+        "ownership_class": "other_or_uncertain",
+        "planning_label": "P",
+        "scenario_description": "Parking przy osiedlu — inny podmiot.",
+        "source_mode": "synthetic_demo",
+        "checked_at": "2026-10-03"
+      },
+      "geometry": { "type": "Point", "coordinates": [19.93, 50.04] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "demo-planning-risk-1",
+        "ownership_class": "municipal",
+        "planning_label": "R",
+        "scenario_description": "Przeznaczenie planistyczne może blokować inwestycję.",
+        "source_mode": "synthetic_demo",
+        "checked_at": "2026-10-03"
+      },
+      "geometry": { "type": "Point", "coordinates": [19.92, 50.048] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "demo-planning-risk-2",
+        "ownership_class": "municipal",
+        "planning_label": "ZN",
+        "scenario_description": "Teren zieleni chronionej — ryzyko niezgodności.",
+        "source_mode": "synthetic_demo",
+        "checked_at": "2026-10-03"
+      },
+      "geometry": { "type": "Point", "coordinates": [19.945, 50.075] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "demo-nodata-1",
+        "ownership_class": "unknown",
+        "planning_label": null,
+        "scenario_description": "Brak pokrycia danymi demonstracyjnymi.",
+        "source_mode": "unavailable",
+        "checked_at": "2026-10-03"
+      },
+      "geometry": { "type": "Point", "coordinates": [19.9, 50.03] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "demo-nodata-2",
+        "ownership_class": "unknown",
+        "planning_label": null,
+        "scenario_description": "Brak pokrycia danymi demonstracyjnymi.",
+        "source_mode": "unavailable",
+        "checked_at": "2026-10-03"
+      },
+      "geometry": { "type": "Point", "coordinates": [19.98, 50.09] }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "demo-nodata-3",
+        "ownership_class": "unknown",
+        "planning_label": null,
+        "scenario_description": "Brak pokrycia danymi demonstracyjnymi.",
+        "source_mode": "unavailable",
+        "checked_at": "2026-10-03"
+      },
+      "geometry": { "type": "Point", "coordinates": [20.0, 50.02] }
+    }
+  ]
+}

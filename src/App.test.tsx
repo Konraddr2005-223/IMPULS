@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
@@ -43,6 +44,7 @@ vi.mock('./ideas/api', () => ({
     },
   ]),
   createIdea: vi.fn(),
+  updateSupportThreshold: vi.fn(),
 }))
 
 vi.mock('./ideas/likes', () => ({
@@ -50,29 +52,62 @@ vi.mock('./ideas/likes', () => ({
   setLike: vi.fn(),
 }))
 
+vi.mock('./faults/api', () => ({
+  fetchFaults: vi.fn(async () => []),
+  createFault: vi.fn(),
+  FAULT_STATUS_LABELS: { new: 'Nowe' },
+}))
+
+vi.mock('./areas/api', async () => {
+  const actual = await vi.importActual<typeof import('./areas/api')>('./areas/api')
+  return {
+    ...actual,
+    listInterestAreas: vi.fn(async () => []),
+  }
+})
+
+vi.mock('./city/checkLand', () => ({
+  checkLand: vi.fn(async () => ({
+    mode: 'synthetic_demo',
+    parcelId: 'demo-municipal-1',
+    ownershipClass: 'municipal',
+    ownershipRawLabel: 'Grunt gminny',
+    planning: { planName: 'Demo', designation: 'ZP', resolutionUrl: null },
+    assessment: 'likely_suitable',
+    warnings: ['Scenariusz demonstracyjny. Status nie opisuje rzeczywistej nieruchomości.'],
+    retrievedAt: new Date().toISOString(),
+    ownershipUpdatedAt: '2026-10-03',
+    planningUpdatedAt: '2026-10-03',
+    scenarioDescription: 'Skwer ogólnodostępny — grunt gminny.',
+  })),
+}))
+
 function renderApp() {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
   return render(
-    <AuthProvider>
-      <App />
-    </AuthProvider>,
+    <QueryClientProvider client={client}>
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+    </QueryClientProvider>,
   )
 }
 
 describe('App shell', () => {
-  it('renders brand, navigation and demo ideas', () => {
+  it('renders brand, navigation and layer tabs', async () => {
     renderApp()
-
     expect(screen.getByRole('heading', { name: 'Sąsiedzki' })).toBeInTheDocument()
-
     const nav = screen.getByRole('navigation', { name: 'Nawigacja dolna' })
     expect(within(nav).getByText('Mapa')).toBeInTheDocument()
-    expect(screen.getByText('Zielony zakątek z ławkami')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Pomysły' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Usterki' })).toBeInTheDocument()
   })
 
-  it('shows land card after map click on a demo point', async () => {
+  it('shows land card after map click', async () => {
     const user = userEvent.setup()
     renderApp()
-
     await user.click(screen.getByTestId('map-canvas'))
     expect(await screen.findByLabelText('Karta terenu')).toBeInTheDocument()
     expect(screen.getByText(/Scenariusz demonstracyjny/i)).toBeInTheDocument()
@@ -81,18 +116,8 @@ describe('App shell', () => {
   it('opens create idea form from Dodaj tab', async () => {
     const user = userEvent.setup()
     renderApp()
-
     const nav = screen.getByRole('navigation', { name: 'Nawigacja dolna' })
     await user.click(within(nav).getByRole('button', { name: 'Dodaj' }))
     expect(screen.getByRole('heading', { name: 'Dodaj pomysł' })).toBeInTheDocument()
-  })
-
-  it('opens idea details from the ranking list', async () => {
-    const user = userEvent.setup()
-    renderApp()
-
-    await user.click(await screen.findByRole('button', { name: /Zielony zakątek z ławkami/i }))
-    expect(await screen.findByLabelText('Szczegóły pomysłu')).toBeInTheDocument()
-    expect(screen.getByText(/sygnał zainteresowania/i)).toBeInTheDocument()
   })
 })

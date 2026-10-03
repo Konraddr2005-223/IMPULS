@@ -1,0 +1,208 @@
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { MapPinned, Trash2 } from 'lucide-react'
+import { useState } from 'react'
+import { useAuth } from '../auth/AuthContext'
+import { getCurrentPosition } from '../lib/geolocation'
+import { copy } from '../ui/copy'
+import {
+  KRAKOW_DISTRICTS,
+  createDistrictArea,
+  createRadiusArea,
+  deleteInterestArea,
+  listInterestAreas,
+} from './api'
+
+type AreasScreenProps = {
+  draftPoint?: { lat: number; lng: number } | null
+}
+
+export function AreasScreen({ draftPoint }: AreasScreenProps) {
+  const { user } = useAuth()
+  const qc = useQueryClient()
+  const [district, setDistrict] = useState<string>(KRAKOW_DISTRICTS[4])
+  const [radiusName, setRadiusName] = useState('Moja okolica')
+  const [radiusM, setRadiusM] = useState(500)
+  const [lat, setLat] = useState(draftPoint?.lat ?? 50.06143)
+  const [lng, setLng] = useState(draftPoint?.lng ?? 19.93658)
+  const [error, setError] = useState<string | null>(null)
+
+  const query = useQuery({
+    queryKey: ['areas', user?.id],
+    enabled: Boolean(user),
+    queryFn: () => listInterestAreas(user!.id),
+  })
+
+  if (!user) {
+    return (
+      <div className="flex-1 mx-auto w-full max-w-xl px-4 py-8">
+        <section className="rounded-[var(--radius-card)] bg-white p-6 border border-black/5">
+          <h2 className="m-0 text-lg font-semibold">Moje okolice</h2>
+          <p className="mt-2 mb-0 text-sm">Zaloguj się, aby zapisać dzielnice i promienie.</p>
+        </section>
+      </div>
+    )
+  }
+
+  async function refresh() {
+    if (!user) return
+    await qc.invalidateQueries({ queryKey: ['areas', user.id] })
+  }
+
+  return (
+    <div className="flex-1 mx-auto w-full max-w-xl px-4 py-6 overflow-y-auto">
+      <h2 className="m-0 text-lg font-semibold flex items-center gap-2">
+        <MapPinned size={20} aria-hidden /> Moje okolice
+      </h2>
+      <p className="mt-1 mb-4 text-sm text-[var(--color-text)]/65">
+        Dzielnice z listy lub punkt z promieniem 50–2000 m. Filtr mapy łączy obszary operatorem
+        OR. Granice dzielnic nie są rysowane jako oficjalne kształty.
+      </p>
+
+      <section className="rounded-[var(--radius-card)] bg-white p-4 border border-black/5 mb-4">
+        <h3 className="m-0 text-sm font-semibold">Dzielnica</h3>
+        <div className="mt-2 flex gap-2">
+          <select
+            value={district}
+            onChange={(e) => setDistrict(e.target.value)}
+            className="flex-1 min-h-11 px-3 rounded-[var(--radius-card)] border border-black/10"
+          >
+            {KRAKOW_DISTRICTS.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="min-h-11 px-3 rounded-[var(--radius-card)] border-0 text-white text-sm cursor-pointer"
+            style={{ background: 'var(--color-ideas)' }}
+            onClick={async () => {
+              setError(null)
+              try {
+                await createDistrictArea(user.id, district)
+                await refresh()
+              } catch (err) {
+                setError(err instanceof Error ? err.message : 'Błąd zapisu')
+              }
+            }}
+          >
+            Dodaj
+          </button>
+        </div>
+      </section>
+
+      <section className="rounded-[var(--radius-card)] bg-white p-4 border border-black/5 mb-4">
+        <h3 className="m-0 text-sm font-semibold">Punkt i promień</h3>
+        <label className="mt-2 flex flex-col gap-1 text-sm">
+          Nazwa
+          <input
+            value={radiusName}
+            onChange={(e) => setRadiusName(e.target.value)}
+            className="min-h-11 px-3 rounded-[var(--radius-card)] border border-black/10"
+          />
+        </label>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <label className="flex flex-col gap-1 text-sm">
+            Lat
+            <input
+              type="number"
+              step="any"
+              value={lat}
+              onChange={(e) => setLat(Number(e.target.value))}
+              className="min-h-11 px-3 rounded-[var(--radius-card)] border border-black/10"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            Lng
+            <input
+              type="number"
+              step="any"
+              value={lng}
+              onChange={(e) => setLng(Number(e.target.value))}
+              className="min-h-11 px-3 rounded-[var(--radius-card)] border border-black/10"
+            />
+          </label>
+        </div>
+        <label className="mt-2 flex flex-col gap-1 text-sm">
+          Promień (m)
+          <input
+            type="number"
+            min={50}
+            max={2000}
+            value={radiusM}
+            onChange={(e) => setRadiusM(Number(e.target.value))}
+            className="min-h-11 px-3 rounded-[var(--radius-card)] border border-black/10"
+          />
+        </label>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="min-h-11 px-3 rounded-[var(--radius-card)] border border-black/10 bg-[var(--color-bg)] text-sm cursor-pointer"
+            onClick={async () => {
+              const pos = await getCurrentPosition()
+              if (!pos.ok) {
+                setError(copy.gpsDenied)
+                return
+              }
+              setLat(pos.lat)
+              setLng(pos.lng)
+            }}
+          >
+            Użyj GPS
+          </button>
+          <button
+            type="button"
+            className="min-h-11 px-3 rounded-[var(--radius-card)] border-0 text-white text-sm cursor-pointer"
+            style={{ background: 'var(--color-action)' }}
+            onClick={async () => {
+              setError(null)
+              try {
+                await createRadiusArea(user.id, radiusName, lat, lng, radiusM)
+                await refresh()
+              } catch (err) {
+                setError(err instanceof Error ? err.message : 'Błąd zapisu')
+              }
+            }}
+          >
+            Zapisz okolicę
+          </button>
+        </div>
+      </section>
+
+      {error && (
+        <p className="text-sm mb-3" style={{ color: 'var(--color-faults)' }}>
+          {error}
+        </p>
+      )}
+
+      <ul className="m-0 p-0 list-none">
+        {(query.data ?? []).map((area) => (
+          <li
+            key={area.id}
+            className="flex items-center justify-between gap-2 border border-black/5 rounded-[var(--radius-card)] bg-white px-4 py-3 mb-2"
+          >
+            <div>
+              <p className="m-0 font-medium text-sm">{area.name}</p>
+              <p className="m-0 text-xs text-[var(--color-text)]/60">
+                {area.kind === 'district'
+                  ? `Dzielnica: ${area.district_code}`
+                  : `Promień ${area.radius_m} m · ${area.lat?.toFixed(4)}, ${area.lng?.toFixed(4)}`}
+              </p>
+            </div>
+            <button
+              type="button"
+              aria-label="Usuń okolicę"
+              className="border-0 bg-transparent cursor-pointer"
+              onClick={async () => {
+                await deleteInterestArea(area.id, user.id)
+                await refresh()
+              }}
+            >
+              <Trash2 size={18} />
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}

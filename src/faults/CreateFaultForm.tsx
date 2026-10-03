@@ -1,6 +1,14 @@
-import { useState, type FormEvent } from 'react'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { Camera, LocateFixed } from 'lucide-react'
+import { useState } from 'react'
+import { useForm } from 'react-hook-form'
 import { useAuth } from '../auth/AuthContext'
 import { demoAccounts } from '../auth/demoAccounts'
+import { createFaultSchema, type CreateFaultFormValues } from '../ideas/schemas'
+import { getCurrentPosition } from '../lib/geolocation'
+import { useOnline } from '../lib/online'
+import { uploadPhoto } from '../lib/storage'
+import { copy } from '../ui/copy'
 import { createFault } from './api'
 import type { FaultRecord } from './types'
 
@@ -25,38 +33,45 @@ export function CreateFaultForm({
 }: CreateFaultFormProps) {
   const { user, loading: authLoading, error: authError, signInDemo, clearError } =
     useAuth()
-  const [category, setCategory] = useState('street_furniture')
-  const [description, setDescription] = useState('')
-  const [lat, setLat] = useState(initialPoint?.lat ?? 50.06143)
-  const [lng, setLng] = useState(initialPoint?.lng ?? 19.93658)
-  const [submitting, setSubmitting] = useState(false)
+  const online = useOnline()
+  const [photo, setPhoto] = useState<File | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
 
-  async function onSubmit(event: FormEvent) {
-    event.preventDefault()
+  const form = useForm<CreateFaultFormValues>({
+    resolver: zodResolver(createFaultSchema),
+    defaultValues: {
+      category: 'street_furniture',
+      description: '',
+      lat: initialPoint?.lat ?? 50.06143,
+      lng: initialPoint?.lng ?? 19.93658,
+    },
+  })
+
+  async function onSubmit(values: CreateFaultFormValues) {
     setFormError(null)
     clearError()
+    if (!online) {
+      setFormError(copy.offlineDraft)
+      return
+    }
     if (!user) {
       setFormError('Zaloguj się, aby zapisać usterkę.')
       return
     }
-    if (description.trim().length < 10) {
-      setFormError('Opis musi mieć co najmniej 10 znaków.')
-      return
-    }
-    setSubmitting(true)
     try {
-      const fault = await createFault(user.id, { category, description, lat, lng })
+      let photoPath: string | null = null
+      if (photo) {
+        photoPath = await uploadPhoto(user.id, photo, 'faults')
+      }
+      const fault = await createFault(user.id, { ...values, photoPath })
       onCreated(fault)
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Nie udało się zapisać.')
-    } finally {
-      setSubmitting(false)
     }
   }
 
   return (
-    <div className="flex-1 mx-auto w-full max-w-xl px-4 py-6">
+    <div className="flex-1 mx-auto w-full max-w-xl px-4 py-6 overflow-y-auto">
       <section className="rounded-[var(--radius-card)] bg-white p-5 border border-black/5">
         <div className="flex items-baseline justify-between gap-2 mb-2">
           <h2 className="m-0 text-lg font-semibold">Dodaj usterkę</h2>
@@ -70,8 +85,13 @@ export function CreateFaultForm({
           </button>
         </div>
         <p className="mt-0 mb-4 text-sm text-[var(--color-text)]/70">
-          Zgłoszenie fikcyjne do dema. Status jest społecznościowy, nie urzędowy.
+          {copy.faultDisclaimer}
         </p>
+        {!online && (
+          <p className="mb-3 text-sm" style={{ color: 'var(--color-faults)' }}>
+            {copy.offlineDraft}
+          </p>
+        )}
 
         {!user && (
           <div className="mb-4 p-3 rounded-[var(--radius-card)] bg-[var(--color-bg)]">
@@ -89,21 +109,20 @@ export function CreateFaultForm({
                 </button>
               ))}
             </div>
-            {(authError || formError) && (
+            {authError && (
               <p className="mt-2 mb-0 text-sm" style={{ color: 'var(--color-faults)' }}>
-                {authError ?? formError}
+                {authError}
               </p>
             )}
           </div>
         )}
 
-        <form onSubmit={onSubmit} className="flex flex-col gap-3">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-3">
           <label className="flex flex-col gap-1 text-sm">
             <span className="font-medium">Kategoria</span>
             <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
               className="min-h-11 px-3 rounded-[var(--radius-card)] border border-black/10"
+              {...form.register('category')}
             >
               {CATEGORIES.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -115,44 +134,73 @@ export function CreateFaultForm({
           <label className="flex flex-col gap-1 text-sm">
             <span className="font-medium">Opis</span>
             <textarea
-              required
               rows={3}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
               className="px-3 py-2 rounded-[var(--radius-card)] border border-black/10 resize-y"
+              {...form.register('description')}
             />
+            {form.formState.errors.description && (
+              <span className="text-xs" style={{ color: 'var(--color-faults)' }}>
+                {form.formState.errors.description.message}
+              </span>
+            )}
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium">Lat</span>
+              Lat
               <input
                 type="number"
                 step="any"
-                value={lat}
-                onChange={(e) => setLat(Number(e.target.value))}
                 className="min-h-11 px-3 rounded-[var(--radius-card)] border border-black/10"
+                {...form.register('lat', { valueAsNumber: true })}
               />
             </label>
             <label className="flex flex-col gap-1 text-sm">
-              <span className="font-medium">Lng</span>
+              Lng
               <input
                 type="number"
                 step="any"
-                value={lng}
-                onChange={(e) => setLng(Number(e.target.value))}
                 className="min-h-11 px-3 rounded-[var(--radius-card)] border border-black/10"
+                {...form.register('lng', { valueAsNumber: true })}
               />
             </label>
           </div>
-          <button
-            type="submit"
-            disabled={submitting || !user}
-            className="min-h-11 px-4 rounded-[var(--radius-card)] border-0 text-white text-sm font-medium cursor-pointer disabled:opacity-50"
-            style={{ background: 'var(--color-faults)' }}
-          >
-            {submitting ? 'Zapisuję…' : 'Zapisz usterkę'}
-          </button>
-          {formError && user && (
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium inline-flex items-center gap-1">
+              <Camera size={16} /> Zdjęcie
+            </span>
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={(e) => setPhoto(e.target.files?.[0] ?? null)}
+            />
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="min-h-11 px-4 inline-flex items-center gap-2 rounded-[var(--radius-card)] border border-black/10 bg-[var(--color-bg)] text-sm cursor-pointer"
+              onClick={async () => {
+                const pos = await getCurrentPosition()
+                if (!pos.ok) {
+                  setFormError(copy.gpsDenied)
+                  return
+                }
+                form.setValue('lat', pos.lat)
+                form.setValue('lng', pos.lng)
+              }}
+            >
+              <LocateFixed size={16} /> GPS
+            </button>
+            <button
+              type="submit"
+              disabled={form.formState.isSubmitting || !user || !online}
+              className="min-h-11 px-4 rounded-[var(--radius-card)] border-0 text-white text-sm font-medium cursor-pointer disabled:opacity-50"
+              style={{ background: 'var(--color-faults)' }}
+            >
+              {form.formState.isSubmitting ? 'Zapisuję…' : 'Zapisz usterkę'}
+            </button>
+          </div>
+          {formError && (
             <p className="m-0 text-sm" style={{ color: 'var(--color-faults)' }}>
               {formError}
             </p>

@@ -1,4 +1,4 @@
-import { CircleMarker, MapContainer, TileLayer, useMapEvents } from 'react-leaflet'
+import { Circle, CircleMarker, MapContainer, TileLayer, useMapEvents } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import {
   KRAKOW_CENTER,
@@ -13,11 +13,20 @@ export type MapMarker = {
   lng: number
   kind: 'idea' | 'fault'
   label: string
+  highlight?: boolean
+}
+
+export type MapCircle = {
+  id: string
+  lat: number
+  lng: number
+  radiusM: number
 }
 
 type MapCanvasProps = {
   className?: string
   markers?: MapMarker[]
+  circles?: MapCircle[]
   onMapClick?: (point: { lat: number; lng: number }) => void
   onMarkerClick?: (marker: MapMarker) => void
 }
@@ -38,6 +47,7 @@ function ClickHandler({
 export function MapCanvas({
   className,
   markers = [],
+  circles = [],
   onMapClick,
   onMarkerClick,
 }: MapCanvasProps) {
@@ -51,16 +61,29 @@ export function MapCanvas({
     >
       <TileLayer attribution={OSM_ATTRIBUTION} url={OSM_TILE_URL} />
       <ClickHandler onMapClick={onMapClick} />
+      {circles.map((c) => (
+        <Circle
+          key={c.id}
+          center={[c.lat, c.lng]}
+          radius={c.radiusM}
+          pathOptions={{
+            color: '#2457D6',
+            fillColor: '#2457D6',
+            fillOpacity: 0.08,
+            weight: 1,
+          }}
+        />
+      ))}
       {markers.map((marker) => (
         <CircleMarker
           key={marker.id}
           center={[marker.lat, marker.lng]}
-          radius={9}
+          radius={marker.highlight ? 12 : 9}
           pathOptions={{
             color: marker.kind === 'idea' ? '#176B4B' : '#C45C26',
             fillColor: marker.kind === 'idea' ? '#176B4B' : '#C45C26',
             fillOpacity: 0.85,
-            weight: 2,
+            weight: marker.highlight ? 3 : 2,
           }}
           eventHandlers={{
             click: (event) => {
