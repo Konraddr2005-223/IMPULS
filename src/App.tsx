@@ -15,7 +15,7 @@ import { useAuth } from './auth/AuthContext'
 import { checkLand } from './city/checkLand'
 import type { LandAssessment } from './city/types'
 import type { CommentRecord } from './comments/api'
-import { DEMO_DISCLAIMER, demoFaults, demoIdeas } from './data/demoContent'
+import { DEMO_DISCLAIMER, demoFaults, demoIdeas, type DemoIdea } from './data/demoContent'
 import { CreateFaultForm } from './faults/CreateFaultForm'
 import { FaultDetailCard } from './faults/FaultDetailCard'
 import { FAULT_CATEGORY_LABELS, FAULT_STATUS_LABELS, fetchFaults } from './faults/api'
@@ -157,9 +157,11 @@ function App() {
       return next
     })
     try {
-      await setLike(ideaId, user.id, liked)
-      await qc.invalidateQueries({ queryKey: ['ideas'] })
-      await qc.invalidateQueries({ queryKey: ['notifications', user.id] })
+      if (ideasFromDb) {
+        await setLike(ideaId, user.id, liked)
+        await qc.invalidateQueries({ queryKey: ['ideas'] })
+        await qc.invalidateQueries({ queryKey: ['notifications', user.id] })
+      }
     } catch (err) {
       setLikedIds(previous)
       throw err
@@ -194,8 +196,34 @@ function App() {
     }
   }
 
-  const selectedIdea =
-    (ideasFromDb ? filteredIdeas : []).find((idea) => idea.id === selectedIdeaId) ?? null
+  function demoIdeaToRecord(demo: DemoIdea): IdeaRecord {
+    return {
+      id: demo.id,
+      city_id: 'krakow',
+      author_id: 'demo-user',
+      title: demo.title,
+      description: demo.description,
+      category: demo.category,
+      district_code: demo.district,
+      photo_path: null,
+      support_threshold: demo.supportThreshold,
+      likes_count: demo.likesCount,
+      revision: 1,
+      status: 'published',
+      lat: demo.lat,
+      lng: demo.lng,
+      created_at: '2026-10-01T12:00:00Z',
+    }
+  }
+
+  const selectedIdea = useMemo<IdeaRecord | null>(() => {
+    if (!selectedIdeaId) return null
+    if (ideasFromDb) {
+      return filteredIdeas.find((idea) => idea.id === selectedIdeaId) ?? null
+    }
+    const demo = demoIdeas.find((idea) => idea.id === selectedIdeaId)
+    return demo ? demoIdeaToRecord(demo) : null
+  }, [selectedIdeaId, ideasFromDb, filteredIdeas])
 
   const selectedFault = useMemo(() => {
     if (!selectedFaultId) return null
@@ -316,12 +344,14 @@ function App() {
             onSelectIdea={(id) => {
               setSelectedIdeaId(id)
               setSelectedFaultId(null)
+              setDraftPoint(null)
               setLand(null)
               setLandError(null)
             }}
             onSelectFault={(id) => {
               setSelectedFaultId(id)
               setSelectedIdeaId(null)
+              setDraftPoint(null)
               setLand(null)
               setLandError(null)
             }}
@@ -595,6 +625,7 @@ function MapScreen({
           label: idea.title,
           sublabel: `${idea.likes_count}/${idea.support_threshold} poparć`,
           highlight: topIdeaIds.has(idea.id),
+          selected: idea.id === selectedIdea?.id,
         }))
       }
       return demoIdeas.map((idea) => ({
@@ -605,6 +636,7 @@ function MapScreen({
         label: idea.title,
         sublabel: `${idea.likesCount}/${idea.supportThreshold} poparć`,
         highlight: topIdeaIds.has(idea.id),
+        selected: idea.id === selectedIdea?.id,
       }))
     }
     if (faults) {
@@ -615,6 +647,7 @@ function MapScreen({
         kind: 'fault' as const,
         label: fault.description.slice(0, 40),
         sublabel: FAULT_STATUS_LABELS[fault.status] ?? fault.status,
+        selected: fault.id === selectedFault?.id,
       }))
     }
     return demoFaults.map((fault) => ({
@@ -624,8 +657,9 @@ function MapScreen({
       kind: 'fault' as const,
       label: fault.title,
       sublabel: fault.status,
+      selected: fault.id === selectedFault?.id,
     }))
-  }, [layer, ideas, demoIdeas, faults, topIdeaIds])
+  }, [layer, ideas, demoIdeas, faults, topIdeaIds, selectedIdea?.id, selectedFault?.id])
 
   const circles: MapCircle[] = useMemo(
     () =>
@@ -878,8 +912,14 @@ function MapScreen({
                   <li key={idea.id} className="border-b border-black/5">
                     <button
                       type="button"
-                      onClick={() => onMapClick({ lat: idea.lat, lng: idea.lng })}
+                      onClick={() => onSelectIdea(idea.id)}
                       className="w-full text-left px-4 py-3 border-0 bg-transparent cursor-pointer hover:bg-black/5 transition-colors"
+                      style={{
+                        background:
+                          selectedIdea?.id === idea.id
+                            ? 'color-mix(in srgb, var(--color-ideas) 8%, white)'
+                            : 'transparent',
+                      }}
                     >
                       <div className="flex items-center justify-between text-[11px]">
                         <span className="font-bold text-[var(--color-ideas)]">

@@ -9,17 +9,36 @@ vi.mock('./map/MapCanvas', () => ({
   MapCanvas: ({
     className,
     onMapClick,
+    onMarkerClick,
   }: {
     className?: string
     onMapClick?: (point: { lat: number; lng: number }) => void
+    onMarkerClick?: (marker: { id: string; lat: number; lng: number; kind: 'idea' | 'fault'; label: string }) => void
   }) => (
-    <button
-      type="button"
-      data-testid="map-canvas"
-      className={className}
-      aria-label="Mapa Krakowa"
-      onClick={() => onMapClick?.({ lat: 50.07, lng: 19.91 })}
-    />
+    <div>
+      <button
+        type="button"
+        data-testid="map-canvas"
+        className={className}
+        aria-label="Mapa Krakowa"
+        onClick={() => onMapClick?.({ lat: 50.07, lng: 19.91 })}
+      />
+      <button
+        type="button"
+        data-testid="map-marker-idea"
+        onClick={() =>
+          onMarkerClick?.({
+            id: 'idea-db-1',
+            lat: 50.07,
+            lng: 19.91,
+            kind: 'idea',
+            label: 'Zielony zakątek z ławkami',
+          })
+        }
+      >
+        Marker
+      </button>
+    </div>
   ),
 }))
 
@@ -131,5 +150,13 @@ describe('App shell', () => {
     await user.click(screen.getByRole('button', { name: 'Sąsiedzki' }))
     expect(screen.getByTestId('map-canvas')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Dodaj pomysł' })).not.toBeInTheDocument()
+  })
+
+  it('shows idea detail card when marker is clicked, not land card', async () => {
+    const user = userEvent.setup()
+    renderApp()
+    await user.click(screen.getByTestId('map-marker-idea'))
+    expect(await screen.findByLabelText('Szczegóły pomysłu')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Karta terenu')).not.toBeInTheDocument()
   })
 })
