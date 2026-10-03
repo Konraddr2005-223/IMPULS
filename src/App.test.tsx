@@ -23,8 +23,31 @@ vi.mock('./map/MapCanvas', () => ({
 }))
 
 vi.mock('./ideas/api', () => ({
-  fetchPublishedIdeas: vi.fn(async () => []),
+  fetchPublishedIdeas: vi.fn(async () => [
+    {
+      id: 'idea-db-1',
+      city_id: 'krakow',
+      author_id: 'user-1',
+      title: 'Zielony zakątek z ławkami',
+      description: 'Dwie ławki i cztery drzewa.',
+      category: 'investment',
+      district_code: 'Krowodrza',
+      photo_path: null,
+      support_threshold: 3,
+      likes_count: 2,
+      revision: 1,
+      status: 'published',
+      lat: 50.07,
+      lng: 19.91,
+      created_at: '2026-10-03T00:00:00Z',
+    },
+  ]),
   createIdea: vi.fn(),
+}))
+
+vi.mock('./ideas/likes', () => ({
+  fetchMyLikedIdeaIds: vi.fn(async () => new Set()),
+  setLike: vi.fn(),
 }))
 
 function renderApp() {
@@ -62,5 +85,14 @@ describe('App shell', () => {
     const nav = screen.getByRole('navigation', { name: 'Nawigacja dolna' })
     await user.click(within(nav).getByRole('button', { name: 'Dodaj' }))
     expect(screen.getByRole('heading', { name: 'Dodaj pomysł' })).toBeInTheDocument()
+  })
+
+  it('opens idea details from the ranking list', async () => {
+    const user = userEvent.setup()
+    renderApp()
+
+    await user.click(await screen.findByRole('button', { name: /Zielony zakątek z ławkami/i }))
+    expect(await screen.findByLabelText('Szczegóły pomysłu')).toBeInTheDocument()
+    expect(screen.getByText(/sygnał zainteresowania/i)).toBeInTheDocument()
   })
 })

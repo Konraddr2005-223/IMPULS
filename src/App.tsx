@@ -5,7 +5,9 @@ import { krakowAdapter } from './city'
 import type { LandAssessment } from './city/types'
 import { DEMO_DISCLAIMER, demoFaults, demoIdeas } from './data/demoContent'
 import { CreateIdeaForm } from './ideas/CreateIdeaForm'
+import { IdeaDetailCard } from './ideas/IdeaDetailCard'
 import { fetchPublishedIdeas } from './ideas/api'
+import { fetchMyLikedIdeaIds, setLike } from './ideas/likes'
 import type { IdeaRecord } from './ideas/types'
 import { isSupabaseConfigured } from './lib/supabase'
 import { LandCard } from './map/LandCard'
@@ -37,6 +39,8 @@ function App() {
   const [ideas, setIdeas] = useState<IdeaRecord[]>([])
   const [ideasSource, setIdeasSource] = useState<'db' | 'demo'>('demo')
   const [ideasError, setIdeasError] = useState<string | null>(null)
+  const [selectedIdeaId, setSelectedIdeaId] = useState<string | null>(null)
+  const [likedIds, setLikedIds] = useState<Set<string>>(new Set())
 
   async function loadIdeas() {
     if (!isSupabaseConfigured) {
@@ -60,7 +64,18 @@ function App() {
     void loadIdeas()
   }, [])
 
+  useEffect(() => {
+    if (!user) {
+      setLikedIds(new Set())
+      return
+    }
+    void fetchMyLikedIdeaIds(user.id)
+      .then(setLikedIds)
+      .catch(() => setLikedIds(new Set()))
+  }, [user])
+
   async function handleMapClick(point: { lat: number; lng: number }) {
+    setSelectedIdeaId(null)
     setDraftPoint(point)
     setLandLoading(true)
     setLandError(null)
@@ -75,7 +90,21 @@ function App() {
     }
   }
 
+  async function handleLikeToggle(ideaId: string, liked: boolean) {
+    if (!user) throw new Error('Wymagane logowanie.')
+    await setLike(ideaId, user.id, liked)
+    setLikedIds((prev) => {
+      const next = new Set(prev)
+      if (liked) next.add(ideaId)
+      else next.delete(ideaId)
+      return next
+    })
+    await loadIdeas()
+  }
+
   const listIdeas = ideasSource === 'db' ? ideas : null
+  const selectedIdea =
+    listIdeas?.find((idea) => idea.id === selectedIdeaId) ?? null
 
   return (
     <div className="min-h-svh flex flex-col">
@@ -104,13 +133,26 @@ function App() {
             ideas={listIdeas}
             ideasSource={ideasSource}
             ideasError={ideasError}
+            selectedIdea={selectedIdea}
+            likedIds={likedIds}
+            canLike={Boolean(user)}
             onLayerChange={setLayer}
             onModeChange={setMode}
             onAdd={() => setTab('dodaj')}
             onMapClick={handleMapClick}
+            onSelectIdea={(id) => {
+              setSelectedIdeaId(id)
+              setLand(null)
+              setLandError(null)
+            }}
+            onCloseIdea={() => setSelectedIdeaId(null)}
+            onLikeToggle={handleLikeToggle}
             onCloseLand={() => {
               setLand(null)
               setLandError(null)
+            }}
+            onCheckLandForIdea={(idea) => {
+              void handleMapClick({ lat: idea.lat, lng: idea.lng })
             }}
           />
         )}
@@ -197,11 +239,18 @@ type MapScreenProps = {
   ideas: IdeaRecord[] | null
   ideasSource: 'db' | 'demo'
   ideasError: string | null
+  selectedIdea: IdeaRecord | null
+  likedIds: Set<string>
+  canLike: boolean
   onLayerChange: (layer: MapLayer) => void
   onModeChange: (mode: MapMode) => void
   onAdd: () => void
   onMapClick: (point: { lat: number; lng: number }) => void
+  onSelectIdea: (id: string) => void
+  onCloseIdea: () => void
+  onLikeToggle: (ideaId: string, liked: boolean) => Promise<void>
   onCloseLand: () => void
+  onCheckLandForIdea: (idea: IdeaRecord) => void
 }
 
 function MapScreen({
@@ -213,11 +262,18 @@ function MapScreen({
   ideas,
   ideasSource,
   ideasError,
+  selectedIdea,
+  likedIds,
+  canLike,
   onLayerChange,
   onModeChange,
   onAdd,
   onMapClick,
+  onSelectIdea,
+  onCloseIdea,
+  onLikeToggle,
   onCloseLand,
+  onCheckLandForIdea,
 }: MapScreenProps) {
   const markers: MapMarker[] = useMemo(() => {
     if (layer === 'pomysly') {
@@ -311,12 +367,24 @@ function MapScreen({
             <ul className="m-0 p-0 list-none">
               {ideas
                 ? ideas.map((idea) => (
-                    <li key={idea.id} className="border-b border-black/5 px-4 py-3">
-                      <p className="m-0 font-medium">{idea.title}</p>
-                      <p className="m-0 mt-1 text-sm text-[var(--color-text)]/65">
-                        {idea.district_code ?? 'Kraków'} · {idea.likes_count}/
-                        {idea.support_threshold} poparć
-                      </p>
+                    <li key={idea.id} className="border-b border-black/5">
+                      <button
+                        type="button"
+                        onClick={() => onSelectIdea(idea.id)}
+                        className="w-full text-left px-4 py-3 border-0 bg-transparent cursor-pointer"
+                        style={{
+                          background:
+                            selectedIdea?.id === idea.id
+                              ? 'color-mix(in srgb, var(--color-ideas) 8%, white)'
+                              : 'transparent',
+                        }}
+                      >
+                        <p className="m-0 font-medium">{idea.title}</p>
+                        <p className="m-0 mt-1 text-sm text-[var(--color-text)]/65">
+                          {idea.district_code ?? 'Kraków'} · {idea.likes_count}/
+                          {idea.support_threshold} poparć
+                        </p>
+                      </button>
                     </li>
                   ))
                 : demoIdeas.map((idea) => (
@@ -350,14 +418,31 @@ function MapScreen({
             className="absolute inset-0 h-full w-full z-0"
             markers={markers}
             onMapClick={onMapClick}
-            onMarkerClick={(marker) => onMapClick({ lat: marker.lat, lng: marker.lng })}
+            onMarkerClick={(marker) => {
+              if (marker.kind === 'idea' && ideas) {
+                onSelectIdea(marker.id)
+                return
+              }
+              onMapClick({ lat: marker.lat, lng: marker.lng })
+            }}
           />
-          <LandCard
-            assessment={land}
-            loading={landLoading}
-            error={landError}
-            onClose={onCloseLand}
-          />
+          {selectedIdea && !land && !landLoading ? (
+            <IdeaDetailCard
+              idea={selectedIdea}
+              liked={likedIds.has(selectedIdea.id)}
+              canLike={canLike}
+              onLikeToggle={(liked) => onLikeToggle(selectedIdea.id, liked)}
+              onClose={onCloseIdea}
+              onCheckLand={() => onCheckLandForIdea(selectedIdea)}
+            />
+          ) : (
+            <LandCard
+              assessment={land}
+              loading={landLoading}
+              error={landError}
+              onClose={onCloseLand}
+            />
+          )}
           <button
             type="button"
             onClick={onAdd}
