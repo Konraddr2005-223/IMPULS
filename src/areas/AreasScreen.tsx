@@ -264,7 +264,8 @@ export function AreasScreen({ draftPoint }: AreasScreenProps) {
 
       <p className="mt-0 mb-4 text-xs text-[var(--color-text)]/65">
         Obszary wielokątne (maksymalnie czworokąty) lub całe dzielnice. Przecinające się okolice
-        automatycznie łączą się w jeden wspólny obszar na mapie.
+        automatycznie łączą się w jeden wspólny obszar na mapie. Na mapie włącz „Grunty gminne”,
+        żeby zobaczyć granatowe działki Gminy Kraków (MSIP, poglądowo).
       </p>
 
       {/* Success notification banner */}

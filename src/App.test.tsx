@@ -126,11 +126,21 @@ describe('App shell', () => {
     const nav = screen.getByRole('navigation', { name: 'Nawigacja dolna' })
     expect(within(nav).getByText('Mapa')).toBeInTheDocument()
     expect(within(nav).queryByText('Dodaj')).not.toBeInTheDocument()
+    expect(within(nav).queryByText('Agent')).not.toBeInTheDocument()
     expect(within(nav).getByText('Powiadomienia')).toBeInTheDocument()
     expect(within(nav).getByText('Moje')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '+ Dodaj' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Pomysły' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Usterki' })).toBeInTheDocument()
+  })
+
+  it('defaults municipal land overlay on and districts off', async () => {
+    renderApp()
+    const municipal = screen.getByRole('checkbox', { name: /Grunty gminne/i })
+    const districts = screen.getByRole('checkbox', { name: /Dzielnice/i })
+    expect(municipal).toBeChecked()
+    expect(districts).not.toBeChecked()
+    expect(screen.getByText(/Grunty Gminy Kraków \(GK\)/i)).toBeInTheDocument()
   })
 
   it('shows land card after map click', async () => {

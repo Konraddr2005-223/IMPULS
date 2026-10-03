@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { PanelLeftClose, PanelLeftOpen, ThumbsUp } from 'lucide-react'
+import { MapAgentPanel } from './agent/MapAgentPanel'
 import { ApplicationEditor } from './applications/ApplicationEditor'
 import {
   PrepareApplicationForm,
@@ -62,6 +63,8 @@ function App() {
   const [filterByAreas, setFilterByAreas] = useState(false)
   const [ideaFilters, setIdeaFilters] = useState<IdeaListFilters>(emptyIdeaFilters)
   const [wmsLayer, setWmsLayer] = useState<WmsLayerId>('none')
+  const [showDistricts, setShowDistricts] = useState(false)
+  const [showMunicipalLand, setShowMunicipalLand] = useState(true)
   const [land, setLand] = useState<LandAssessment | null>(null)
   const [landLoading, setLandLoading] = useState(false)
   const [landError, setLandError] = useState<string | null>(null)
@@ -71,6 +74,7 @@ function App() {
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set())
   const [application, setApplication] = useState<ApplicationRecord | null>(null)
   const [prepareOpen, setPrepareOpen] = useState(false)
+  const [agentOpen, setAgentOpen] = useState(false)
   const [prepareComments, setPrepareComments] = useState<CommentRecord[]>([])
   const [generateBusy, setGenerateBusy] = useState(false)
   const [generateError, setGenerateError] = useState<string | null>(null)
@@ -319,6 +323,8 @@ function App() {
             ideaFilters={ideaFilters}
             districtOptions={uniqueDistricts(ideas)}
             wmsLayer={wmsLayer}
+            showDistricts={showDistricts}
+            showMunicipalLand={showMunicipalLand}
             ideasSource={ideasFromDb ? 'db' : 'demo'}
             faultsSource={faultsFromDb ? 'db' : 'demo'}
             selectedIdea={selectedIdea}
@@ -328,6 +334,8 @@ function App() {
             onFilterByAreasChange={setFilterByAreas}
             onIdeaFiltersChange={setIdeaFilters}
             onWmsLayerChange={setWmsLayer}
+            onShowDistrictsChange={setShowDistricts}
+            onShowMunicipalLandChange={setShowMunicipalLand}
             onLayerChange={(next) => {
               setLayer(next)
               setSelectedIdeaId(null)
@@ -352,7 +360,11 @@ function App() {
               setLand(null)
               setLandError(null)
             }}
-            onCloseIdea={() => setSelectedIdeaId(null)}
+            onCloseIdea={() => {
+              setSelectedIdeaId(null)
+              setAgentOpen(false)
+              setPrepareOpen(false)
+            }}
             onCloseFault={() => setSelectedFaultId(null)}
             onFaultUpdated={() => {
               void qc.invalidateQueries({ queryKey: ['faults'] })
@@ -367,15 +379,27 @@ function App() {
             }}
             onPrepareApplication={(comments) => {
               setPrepareComments(comments)
+              setAgentOpen(false)
               setPrepareOpen(true)
               setGenerateError(null)
             }}
+            onOpenAgent={(comments) => {
+              setPrepareComments(comments)
+              setPrepareOpen(false)
+              setAgentOpen(true)
+              setGenerateError(null)
+            }}
             prepareOpen={prepareOpen}
+            agentOpen={agentOpen}
+            agentComments={prepareComments}
             generateBusy={generateBusy}
             generateError={generateError}
             onCancelPrepare={() => {
               setPrepareOpen(false)
               setGenerateError(null)
+            }}
+            onCancelAgent={() => {
+              setAgentOpen(false)
             }}
             onConfirmPrepare={(items) => {
               if (!selectedIdea) return
@@ -523,6 +547,8 @@ type MapScreenProps = {
   ideaFilters: IdeaListFilters
   districtOptions: string[]
   wmsLayer: WmsLayerId
+  showDistricts: boolean
+  showMunicipalLand: boolean
   ideasSource: 'db' | 'demo'
   faultsSource: 'db' | 'demo'
   selectedIdea: IdeaRecord | null
@@ -532,6 +558,8 @@ type MapScreenProps = {
   onFilterByAreasChange: (v: boolean) => void
   onIdeaFiltersChange: (f: IdeaListFilters) => void
   onWmsLayerChange?: (layer: WmsLayerId) => void
+  onShowDistrictsChange: (v: boolean) => void
+  onShowMunicipalLandChange: (v: boolean) => void
   onLayerChange: (layer: MapLayer) => void
   onAdd: () => void
   onMapClick: (point: { lat: number; lng: number }) => void
@@ -545,10 +573,14 @@ type MapScreenProps = {
   onCheckLandForIdea: (idea: IdeaRecord) => void
   onCheckLandForPoint: (point: { lat: number; lng: number }) => void
   onPrepareApplication: (comments: CommentRecord[]) => void
+  onOpenAgent: (comments: CommentRecord[]) => void
   prepareOpen: boolean
+  agentOpen: boolean
+  agentComments: CommentRecord[]
   generateBusy: boolean
   generateError: string | null
   onCancelPrepare: () => void
+  onCancelAgent: () => void
   onConfirmPrepare: (items: CostLineDraft[]) => void
   onThresholdSaved: () => void
   onAddIdeaAtPoint?: () => void
@@ -569,6 +601,8 @@ function MapScreen({
   ideaFilters,
   districtOptions,
   wmsLayer,
+  showDistricts,
+  showMunicipalLand,
   ideasSource,
   faultsSource,
   selectedIdea,
@@ -578,6 +612,8 @@ function MapScreen({
   onFilterByAreasChange,
   onIdeaFiltersChange,
   onWmsLayerChange: _onWmsLayerChange,
+  onShowDistrictsChange,
+  onShowMunicipalLandChange,
   onLayerChange,
   onAdd,
   onMapClick,
@@ -591,10 +627,14 @@ function MapScreen({
   onCheckLandForIdea,
   onCheckLandForPoint,
   onPrepareApplication,
+  onOpenAgent,
   prepareOpen,
+  agentOpen,
+  agentComments,
   generateBusy,
   generateError,
   onCancelPrepare,
+  onCancelAgent,
   onConfirmPrepare,
   onThresholdSaved,
   onAddIdeaAtPoint,
@@ -710,6 +750,14 @@ function MapScreen({
     return null
   }, [selectedIdea, selectedFault])
 
+  const highlightedDistricts = useMemo(
+    () =>
+      areas
+        .filter((a) => a.kind === 'district' && a.district_code)
+        .map((a) => a.district_code as string),
+    [areas],
+  )
+
   return (
     <div className="flex-1 min-h-0 flex flex-col">
       <div className="shrink-0 px-3 py-2 border-b border-black/5 bg-white flex flex-wrap items-center gap-2 z-10">
@@ -774,6 +822,26 @@ function MapScreen({
             className="rounded"
           />
           Moje okolice
+        </label>
+
+        <label className="inline-flex items-center gap-1.5 text-xs text-[var(--color-text)]/75 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={showMunicipalLand}
+            onChange={(e) => onShowMunicipalLandChange(e.target.checked)}
+            className="rounded"
+          />
+          Grunty gminne
+        </label>
+
+        <label className="inline-flex items-center gap-1.5 text-xs text-[var(--color-text)]/75 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={showDistricts}
+            onChange={(e) => onShowDistrictsChange(e.target.checked)}
+            className="rounded"
+          />
+          Dzielnice
         </label>
 
         {layer === 'pomysly' && (
@@ -872,11 +940,23 @@ function MapScreen({
           {DEMO_DISCLAIMER}
           {` · Pomysły: ${ideasSource} · Usterki: ${faultsSource}`}
         </span>
-        {wmsLayer !== 'none' && (
-          <span className="font-semibold text-blue-700">
-            Aktywna warstwa WMS: {wmsLayer === 'mpzp' ? 'MPZP (Plany)' : 'Struktura Własności'}
-          </span>
-        )}
+        <span className="inline-flex items-center gap-2">
+          {showMunicipalLand && (
+            <span className="font-medium text-[#142D6E]">
+              Grunty Gminy Kraków (GK)
+            </span>
+          )}
+          {showDistricts && (
+            <span className="font-medium text-emerald-800">
+              Obrys dzielnic (poglądowy)
+            </span>
+          )}
+          {wmsLayer !== 'none' && (
+            <span className="font-semibold text-blue-700">
+              WMS: {wmsLayer === 'mpzp' ? 'MPZP (Plany)' : 'Struktura Własności'}
+            </span>
+          )}
+        </span>
       </p>
 
       <div className={`flex-1 min-h-0 grid ${showTopIdeas ? 'md:grid-cols-[minmax(280px,360px)_1fr]' : 'grid-cols-1'}`}>
@@ -1079,6 +1159,9 @@ function MapScreen({
             draftPoint={draftPoint}
             centerPoint={centerPoint}
             wmsLayer={wmsLayer}
+            showDistricts={showDistricts}
+            showMunicipalLand={showMunicipalLand}
+            highlightedDistricts={highlightedDistricts}
             onMapClick={onMapClick}
             onMarkerClick={(marker) => {
               if (marker.kind === 'idea') {
@@ -1092,6 +1175,23 @@ function MapScreen({
               onMapClick({ lat: marker.lat, lng: marker.lng })
             }}
           />
+          {agentOpen && selectedIdea ? (
+            <MapAgentPanel
+              idea={selectedIdea}
+              neighborComments={agentComments.map((c) => c.body).join('\n')}
+              landNote={
+                land
+                  ? `Ocena terenu: ${land.assessment}${land.scenarioDescription ? ` — ${land.scenarioDescription}` : ''}`
+                  : undefined
+              }
+              onClose={onCancelAgent}
+              onOpenClassicPrepare={() => {
+                onCancelAgent()
+                onPrepareApplication(agentComments)
+              }}
+            />
+          ) : null}
+
           {prepareOpen && selectedIdea ? (
             <>
               <PrepareApplicationForm
@@ -1110,7 +1210,11 @@ function MapScreen({
             </>
           ) : null}
 
-          {selectedIdea && !land && !landLoading && !prepareOpen && (
+          {selectedIdea &&
+            !land &&
+            !landLoading &&
+            !prepareOpen &&
+            !agentOpen && (
             <IdeaDetailCard
               idea={selectedIdea}
               liked={likedIds.has(selectedIdea.id)}
@@ -1121,6 +1225,7 @@ function MapScreen({
               onClose={onCloseIdea}
               onCheckLand={() => onCheckLandForIdea(selectedIdea)}
               onPrepareApplication={onPrepareApplication}
+              onOpenAgent={onOpenAgent}
               onThresholdSaved={onThresholdSaved}
             />
           )}

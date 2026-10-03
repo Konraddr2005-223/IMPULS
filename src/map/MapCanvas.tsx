@@ -18,6 +18,8 @@ import {
   OSM_ATTRIBUTION,
   OSM_TILE_URL,
 } from './krakow'
+import { DistrictsLayer } from './DistrictsLayer'
+import { MunicipalLandLayer } from './MunicipalLandLayer'
 import { wmsSources } from '../city/krakow/config'
 
 export type MapMarker = {
@@ -48,6 +50,12 @@ type MapCanvasProps = {
   draftPoint?: { lat: number; lng: number } | null
   centerPoint?: { lat: number; lng: number } | null
   wmsLayer?: WmsLayerId
+  /** Draw Kraków administrative district polygons. */
+  showDistricts?: boolean
+  /** Interest-area district codes to highlight on the overlay. */
+  highlightedDistricts?: string[]
+  /** Green overlay of city-owned parcels (MSIP GK = 11). */
+  showMunicipalLand?: boolean
   onMapClick?: (point: { lat: number; lng: number }) => void
   onMarkerClick?: (marker: MapMarker) => void
 }
@@ -181,6 +189,9 @@ export function MapCanvas({
   draftPoint,
   centerPoint,
   wmsLayer = 'none',
+  showDistricts = false,
+  highlightedDistricts = [],
+  showMunicipalLand = false,
   onMapClick,
   onMarkerClick,
 }: MapCanvasProps) {
@@ -218,6 +229,12 @@ export function MapCanvas({
           opacity={0.65}
           attribution="&copy; MSIP Kraków — Struktura Własności"
         />
+      )}
+
+      {showMunicipalLand && <MunicipalLandLayer />}
+
+      {showDistricts && (
+        <DistrictsLayer highlightedDistricts={highlightedDistricts} />
       )}
 
       <ClickHandler
