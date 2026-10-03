@@ -13,7 +13,10 @@ type MyScreenProps = {
   onOpenApplication: (app: ApplicationRecord) => void
 }
 
-export function MyScreen({ onOpenAreas, onOpenApplication }: MyScreenProps) {
+export function MyScreen({
+  onOpenAreas,
+  onOpenApplication,
+}: MyScreenProps) {
   const { user, displayName } = useAuth()
 
   const ideasQuery = useQuery({

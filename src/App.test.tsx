@@ -101,6 +101,7 @@ describe('App shell', () => {
     expect(screen.getByRole('heading', { name: 'Sąsiedzki' })).toBeInTheDocument()
     const nav = screen.getByRole('navigation', { name: 'Nawigacja dolna' })
     expect(within(nav).getByText('Mapa')).toBeInTheDocument()
+    expect(within(nav).queryByText('Agent')).not.toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Pomysły' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Usterki' })).toBeInTheDocument()
   })

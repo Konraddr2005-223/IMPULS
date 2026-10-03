@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { Layers } from 'lucide-react'
+import { MapAgentPanel } from './agent/MapAgentPanel'
 import { ApplicationEditor } from './applications/ApplicationEditor'
 import {
   PrepareApplicationForm,
@@ -75,6 +76,7 @@ function App() {
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set())
   const [application, setApplication] = useState<ApplicationRecord | null>(null)
   const [prepareOpen, setPrepareOpen] = useState(false)
+  const [agentOpen, setAgentOpen] = useState(false)
   const [prepareComments, setPrepareComments] = useState<CommentRecord[]>([])
   const [generateBusy, setGenerateBusy] = useState(false)
   const [generateError, setGenerateError] = useState<string | null>(null)
@@ -297,7 +299,11 @@ function App() {
               setLand(null)
               setLandError(null)
             }}
-            onCloseIdea={() => setSelectedIdeaId(null)}
+            onCloseIdea={() => {
+              setSelectedIdeaId(null)
+              setAgentOpen(false)
+              setPrepareOpen(false)
+            }}
             onCloseFault={() => setSelectedFaultId(null)}
             onFaultUpdated={() => {
               void qc.invalidateQueries({ queryKey: ['faults'] })
@@ -312,15 +318,27 @@ function App() {
             }}
             onPrepareApplication={(comments) => {
               setPrepareComments(comments)
+              setAgentOpen(false)
               setPrepareOpen(true)
               setGenerateError(null)
             }}
+            onOpenAgent={(comments) => {
+              setPrepareComments(comments)
+              setPrepareOpen(false)
+              setAgentOpen(true)
+              setGenerateError(null)
+            }}
             prepareOpen={prepareOpen}
+            agentOpen={agentOpen}
+            agentComments={prepareComments}
             generateBusy={generateBusy}
             generateError={generateError}
             onCancelPrepare={() => {
               setPrepareOpen(false)
               setGenerateError(null)
+            }}
+            onCancelAgent={() => {
+              setAgentOpen(false)
             }}
             onConfirmPrepare={(items) => {
               if (!selectedIdea) return
@@ -489,10 +507,14 @@ type MapScreenProps = {
   onCheckLandForIdea: (idea: IdeaRecord) => void
   onCheckLandForPoint: (point: { lat: number; lng: number }) => void
   onPrepareApplication: (comments: CommentRecord[]) => void
+  onOpenAgent: (comments: CommentRecord[]) => void
   prepareOpen: boolean
+  agentOpen: boolean
+  agentComments: CommentRecord[]
   generateBusy: boolean
   generateError: string | null
   onCancelPrepare: () => void
+  onCancelAgent: () => void
   onConfirmPrepare: (items: CostLineDraft[]) => void
   onThresholdSaved: () => void
 }
@@ -539,10 +561,14 @@ function MapScreen({
   onCheckLandForIdea,
   onCheckLandForPoint,
   onPrepareApplication,
+  onOpenAgent,
   prepareOpen,
+  agentOpen,
+  agentComments,
   generateBusy,
   generateError,
   onCancelPrepare,
+  onCancelAgent,
   onConfirmPrepare,
   onThresholdSaved,
 }: MapScreenProps) {
@@ -996,6 +1022,23 @@ function MapScreen({
               onMapClick({ lat: marker.lat, lng: marker.lng })
             }}
           />
+          {agentOpen && selectedIdea ? (
+            <MapAgentPanel
+              idea={selectedIdea}
+              neighborComments={agentComments.map((c) => c.body).join('\n')}
+              landNote={
+                land
+                  ? `Ocena terenu: ${land.assessment}${land.scenarioDescription ? ` — ${land.scenarioDescription}` : ''}`
+                  : undefined
+              }
+              onClose={onCancelAgent}
+              onOpenClassicPrepare={() => {
+                onCancelAgent()
+                onPrepareApplication(agentComments)
+              }}
+            />
+          ) : null}
+
           {prepareOpen && selectedIdea ? (
             <>
               <PrepareApplicationForm
@@ -1014,7 +1057,11 @@ function MapScreen({
             </>
           ) : null}
 
-          {selectedIdea && !land && !landLoading && !prepareOpen && (
+          {selectedIdea &&
+            !land &&
+            !landLoading &&
+            !prepareOpen &&
+            !agentOpen && (
             <IdeaDetailCard
               idea={selectedIdea}
               liked={likedIds.has(selectedIdea.id)}
@@ -1025,6 +1072,7 @@ function MapScreen({
               onClose={onCloseIdea}
               onCheckLand={() => onCheckLandForIdea(selectedIdea)}
               onPrepareApplication={onPrepareApplication}
+              onOpenAgent={onOpenAgent}
               onThresholdSaved={onThresholdSaved}
             />
           )}

@@ -16,6 +16,8 @@ type IdeaDetailCardProps = {
   onClose: () => void
   onCheckLand: () => void
   onPrepareApplication: (selectedComments: CommentRecord[]) => void
+  /** Primary path: open Asystent BO panel on the map (PDF). */
+  onOpenAgent: (selectedComments: CommentRecord[]) => void
   onThresholdSaved: () => void
 }
 
@@ -29,6 +31,7 @@ export function IdeaDetailCard({
   onClose,
   onCheckLand,
   onPrepareApplication,
+  onOpenAgent,
   onThresholdSaved,
 }: IdeaDetailCardProps) {
   const [busy, setBusy] = useState(false)
@@ -97,10 +100,18 @@ export function IdeaDetailCard({
     }
   }
 
+  function selectedComments() {
+    return comments.filter((c) => selected.has(c.id))
+  }
+
+  function openAgent() {
+    setError(null)
+    onOpenAgent(selectedComments())
+  }
+
   function openPrepare() {
     setError(null)
-    const chosen = comments.filter((c) => selected.has(c.id))
-    onPrepareApplication(chosen)
+    onPrepareApplication(selectedComments())
   }
 
   const photoUrl = idea.photo_path ? publicPhotoUrl(idea.photo_path) : null
@@ -233,24 +244,35 @@ export function IdeaDetailCard({
         </button>
       </div>
 
-      {/* AI Application prepare CTA (opens cost/scope form, then generates) */}
+      {/* Primary: Asystent BO on map → formal draft + PDF. Classic prepare stays as backup. */}
       {isAuthor && (
-        <div className="pt-1">
+        <div className="pt-1 space-y-2">
           <button
             type="button"
-            onClick={openPrepare}
+            onClick={openAgent}
             disabled={!reached}
             className="w-full min-h-11 px-4 rounded-[var(--radius-card)] border-0 text-white text-sm font-medium cursor-pointer disabled:opacity-50 inline-flex items-center justify-center gap-2 shadow-md transition-all"
             style={{ background: reached ? 'var(--color-ideas)' : '#6B7280' }}
           >
             <Sparkles size={16} />
             {reached
-              ? 'Przygotuj wniosek BO (zakres + AI)'
+              ? 'Generuj wniosek BO (+ PDF)'
               : `Wniosek odblokuje się przy ${idea.support_threshold} poparciach`}
           </button>
+          {reached && (
+            <button
+              type="button"
+              onClick={openPrepare}
+              className="w-full min-h-10 px-3 rounded-[var(--radius-card)] border border-black/10 bg-white text-xs font-medium cursor-pointer"
+            >
+              Zapas: klasyczny zakres katalogu
+            </button>
+          )}
           {!reached && (
             <p className="mt-1 mb-0 text-[11px] text-center text-[var(--color-text)]/50">
-              Zbierz jeszcze {Math.max(0, idea.support_threshold - idea.likes_count)} poparć, aby odblokować generator wniosku BO.
+              Zbierz jeszcze{' '}
+              {Math.max(0, idea.support_threshold - idea.likes_count)} poparć,
+              aby odblokować generowanie wniosku.
             </p>
           )}
         </div>
