@@ -52,10 +52,23 @@ export function CreateFaultForm({
     },
   })
 
+  useEffect(() => {
+    const draft = loadOfflineDraft<CreateFaultFormValues>('fault', user?.id ?? null)
+    if (draft) {
+      form.reset({
+        category: draft.category ?? 'street_furniture',
+        description: draft.description ?? '',
+        lat: draft.lat ?? initialPoint?.lat ?? 50.06143,
+        lng: draft.lng ?? initialPoint?.lng ?? 19.93658,
+      })
+    }
+  }, [user?.id, form, initialPoint])
+
   async function onSubmit(values: CreateFaultFormValues) {
     setFormError(null)
     clearError()
     if (!online) {
+      saveOfflineDraft('fault', user?.id ?? null, values)
       setFormError(copy.offlineDraft)
       return
     }
@@ -69,6 +82,7 @@ export function CreateFaultForm({
         photoPath = await uploadPhoto(user.id, photo, 'faults')
       }
       const fault = await createFault(user.id, { ...values, photoPath })
+      clearOfflineDraft('fault', user.id)
       onCreated(fault)
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Nie udało się zapisać.')
