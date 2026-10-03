@@ -97,3 +97,25 @@ textarea:focus:not(:focus-visible) {
     stroke-opacity: 0.95;
   }
 }
+
+/* Custom draggable polygon vertex pin */
+.polygon-vertex-icon {
+  background: transparent !important;
+  border: none !important;
+}
+
+.polygon-vertex-pin {
+  cursor: grab;
+  user-select: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.polygon-vertex-pin:hover {
+  transform: scale(1.15);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4) !important;
+}
+
+.polygon-vertex-pin:active {
+  cursor: grabbing;
+  transform: scale(1.22);
+}

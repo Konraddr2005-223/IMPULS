@@ -103,4 +103,42 @@ describe('PolygonPicker', () => {
     const addedPoints = onChange.mock.calls[0][0]
     expect(addedPoints).toHaveLength(4)
   })
+
+  it('renders interactive chips for placed vertices and allows selecting and deleting a specific vertex', async () => {
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+
+    const initialPoints = [
+      { lat: 50.01, lng: 19.01 },
+      { lat: 50.02, lng: 19.02 },
+      { lat: 50.03, lng: 19.03 },
+    ]
+
+    render(
+      <PolygonPicker
+        points={initialPoints}
+        onChange={onChange}
+      />,
+    )
+
+    // Chip for W2 is visible
+    const chipW2 = screen.getByTitle(/W2 do przesunięcia/i)
+    expect(chipW2).toBeInTheDocument()
+
+    // Click W2 to select it for moving
+    await user.click(chipW2)
+
+    // Moving action badge appears with "Przesuwanie W2"
+    expect(screen.getByText(/Przesuwanie W2/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Gotowe/i })).toBeInTheDocument()
+
+    // Delete W2 via the badge delete button
+    const deleteBtn = screen.getByRole('button', { name: /Usuń/i })
+    await user.click(deleteBtn)
+
+    expect(onChange).toHaveBeenCalledWith([
+      { lat: 50.01, lng: 19.01 },
+      { lat: 50.03, lng: 19.03 },
+    ])
+  })
 })

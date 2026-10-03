@@ -1,7 +1,8 @@
+import L from 'leaflet'
 import { useEffect, useMemo, useState } from 'react'
 import {
-  CircleMarker,
   MapContainer,
+  Marker,
   Polygon,
   Polyline,
   TileLayer,
@@ -14,8 +15,10 @@ import {
   AlertCircle,
   CheckCircle2,
   LocateFixed,
+  Move,
   RotateCcw,
   Sparkles,
+  Trash2,
   Undo2,
 } from 'lucide-react'
 import {
@@ -35,22 +38,60 @@ export type PolygonPickerProps = {
   hint?: string
 }
 
+function getVertexIcon(index: number, isSelected: boolean, accentColor: string) {
+  const bg = isSelected ? '#D97706' : accentColor
+  const size = isSelected ? 28 : 24
+  const half = size / 2
+  return L.divIcon({
+    className: 'polygon-vertex-icon',
+    html: `<div class="polygon-vertex-pin" style="
+      width: ${size}px;
+      height: ${size}px;
+      border-radius: 9999px;
+      background-color: ${bg};
+      border: 2px solid #ffffff;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+      color: #ffffff;
+      font-size: 11px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transform: translate(-${half}px, -${half}px);
+    ">W${index + 1}</div>`,
+    iconSize: [size, size],
+    iconAnchor: [half, half],
+  })
+}
+
 function MapClickHandler({
   points,
+  selectedIdx,
   onAddPoint,
+  onMovePoint,
 }: {
   points: LatLngPoint[]
+  selectedIdx: number | null
   onAddPoint: (point: LatLngPoint) => void
+  onMovePoint: (index: number, point: LatLngPoint) => void
 }) {
   useMapEvents({
     click(event) {
-      if (points.length >= 4) {
-        return
-      }
-      onAddPoint({
+      const clickPoint = {
         lat: Number(event.latlng.lat.toFixed(5)),
         lng: Number(event.latlng.lng.toFixed(5)),
-      })
+      }
+
+      // If a vertex is currently selected, clicking anywhere moves that vertex!
+      if (selectedIdx != null && selectedIdx >= 0 && selectedIdx < points.length) {
+        onMovePoint(selectedIdx, clickPoint)
+        return
+      }
+
+      // Otherwise add a new point if under 4
+      if (points.length < 4) {
+        onAddPoint(clickPoint)
+      }
     },
   })
   return null
@@ -84,9 +125,10 @@ export function PolygonPicker({
   locating = false,
   accentColor = '#176B4B',
   label = 'Wskaż wierzchołki okolicy na mapie',
-  hint = 'Klikaj na mapie, aby wyznaczyć do 4 wierzchołków wielokąta (maksymalnie czworokąt).',
+  hint = 'Klikaj na mapie, aby wyznaczyć wierzchołki (maks. 4). Możesz przeciągać postawione punkty w dowolnej chwili.',
 }: PolygonPickerProps) {
   const [mounted, setMounted] = useState(false)
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
 
   useEffect(() => {
     setMounted(true)
@@ -107,17 +149,36 @@ export function PolygonPicker({
     onChange([...points, point])
   }
 
+  function handleMovePoint(index: number, point: LatLngPoint) {
+    const next = [...points]
+    next[index] = point
+    onChange(next)
+  }
+
+  function handleDeletePoint(index: number) {
+    const next = points.filter((_, i) => i !== index)
+    onChange(next)
+    if (selectedIdx === index) {
+      setSelectedIdx(null)
+    } else if (selectedIdx != null && selectedIdx > index) {
+      setSelectedIdx(selectedIdx - 1)
+    }
+  }
+
   function handleUndo() {
     if (points.length === 0) return
+    if (selectedIdx === points.length - 1) {
+      setSelectedIdx(null)
+    }
     onChange(points.slice(0, -1))
   }
 
   function handleReset() {
+    setSelectedIdx(null)
     onChange([])
   }
 
   function handleDefaultQuad() {
-    // Quick helper to generate a default 4-point rectangle centered around the map center
     const center = centroid
     const deltaLat = 0.0025
     const deltaLng = 0.004
@@ -194,17 +255,56 @@ export function PolygonPicker({
           <div className="mx-auto max-w-fit px-3 py-1 rounded-full bg-white/95 backdrop-blur-xs text-[11px] font-medium text-[var(--color-text)] shadow-md border border-black/10 flex items-center gap-2">
             <span
               className={`inline-block w-2 h-2 rounded-full ${
-                isComplete ? 'bg-emerald-500' : 'animate-pulse'
+                selectedIdx != null
+                  ? 'bg-amber-500 animate-ping'
+                  : isComplete
+                    ? 'bg-emerald-500'
+                    : 'animate-pulse'
               }`}
-              style={{ backgroundColor: isComplete ? undefined : accentColor }}
+              style={{
+                backgroundColor:
+                  selectedIdx != null ? '#D97706' : isComplete ? undefined : accentColor,
+              }}
             />
-            {points.length === 0 && 'Kliknij na mapie, aby postawić 1. wierzchołek'}
-            {points.length === 1 && 'Postaw 2. wierzchołek'}
-            {points.length === 2 && 'Postaw 3. wierzchołek, aby domknąć trójkąt'}
-            {points.length === 3 && 'Możesz dodać 4. wierzchołek dla czworokąta'}
-            {points.length === 4 && 'Osiągnięto limit: 4 wierzchołki (czworokąt)'}
+            {selectedIdx != null
+              ? `Przesuwasz wierzchołek W${selectedIdx + 1} — przeciągnij go lub kliknij w nowe miejsce`
+              : points.length === 0
+                ? 'Kliknij na mapie, aby postawić 1. wierzchołek'
+                : points.length === 1
+                  ? 'Postaw 2. wierzchołek (możesz też przeciągać W1)'
+                  : points.length === 2
+                    ? 'Postaw 3. wierzchołek, aby domknąć trójkąt'
+                    : points.length === 3
+                      ? 'Możesz dodać 4. wierzchołek lub przeciągać istniejące'
+                      : 'Czworokąt gotowy — przeciągaj wierzchołki W1–W4, aby zmienić kształt'}
           </div>
         </div>
+
+        {/* Selected vertex action badge */}
+        {selectedIdx != null && (
+          <div className="absolute top-11 left-2.5 right-2.5 z-1000 flex items-center justify-center pointer-events-auto">
+            <div className="px-3 py-1.5 rounded-xl bg-amber-500 text-white text-xs font-semibold shadow-lg flex items-center gap-2 border border-amber-600/30">
+              <Move size={14} />
+              <span>Przesuwanie W{selectedIdx + 1}</span>
+              <button
+                type="button"
+                onClick={() => setSelectedIdx(null)}
+                className="px-2 py-0.5 rounded-md bg-white/25 hover:bg-white/40 text-white text-[11px] font-bold border-0 cursor-pointer transition-colors"
+              >
+                Gotowe
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeletePoint(selectedIdx)}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold border-0 cursor-pointer transition-colors"
+                title="Usuń ten wierzchołek"
+              >
+                <Trash2 size={12} />
+                Usuń
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Quick quad generator shortcut floating on bottom-right of map */}
         {points.length === 0 && (
@@ -229,7 +329,12 @@ export function PolygonPicker({
             aria-label="Interaktywna mapa wyboru wielokąta"
           >
             <TileLayer attribution={OSM_ATTRIBUTION} url={OSM_TILE_URL} />
-            <MapClickHandler points={points} onAddPoint={handleAddPoint} />
+            <MapClickHandler
+              points={points}
+              selectedIdx={selectedIdx}
+              onAddPoint={handleAddPoint}
+              onMovePoint={handleMovePoint}
+            />
             <MapCenterSync center={centroid} />
             <MapInvalidateSize />
 
@@ -258,23 +363,43 @@ export function PolygonPicker({
               />
             )}
 
-            {/* Render each placed vertex marker */}
+            {/* Render each placed draggable vertex marker */}
             {points.map((p, idx) => (
-              <CircleMarker
-                key={`vertex-${idx}-${p.lat}-${p.lng}`}
-                center={[p.lat, p.lng]}
-                radius={8}
-                pathOptions={{
-                  color: '#ffffff',
-                  fillColor: accentColor,
-                  fillOpacity: 1,
-                  weight: 2.5,
+              <Marker
+                key={`vertex-draggable-${idx}`}
+                position={[p.lat, p.lng]}
+                draggable={true}
+                icon={getVertexIcon(idx, selectedIdx === idx, accentColor)}
+                eventHandlers={{
+                  click: (e) => {
+                    e.originalEvent?.stopPropagation?.()
+                    setSelectedIdx((prev) => (prev === idx ? null : idx))
+                  },
+                  dragstart: () => {
+                    setSelectedIdx(idx)
+                  },
+                  drag: (e) => {
+                    const latlng = e.target.getLatLng()
+                    handleMovePoint(idx, {
+                      lat: Number(latlng.lat.toFixed(5)),
+                      lng: Number(latlng.lng.toFixed(5)),
+                    })
+                  },
+                  dragend: (e) => {
+                    const latlng = e.target.getLatLng()
+                    handleMovePoint(idx, {
+                      lat: Number(latlng.lat.toFixed(5)),
+                      lng: Number(latlng.lng.toFixed(5)),
+                    })
+                  },
                 }}
               >
-                <Tooltip permanent direction="top" offset={[0, -6]}>
-                  <span className="text-[10px] font-bold">W{idx + 1}</span>
+                <Tooltip direction="top" offset={[0, -10]}>
+                  <span className="text-[11px] font-semibold">
+                    Wierzchołek {idx + 1} (przeciągnij, aby przesunąć)
+                  </span>
                 </Tooltip>
-              </CircleMarker>
+              </Marker>
             ))}
           </MapContainer>
         ) : (
@@ -283,6 +408,42 @@ export function PolygonPicker({
           </div>
         )}
       </div>
+
+      {/* Vertex Chips Bar (allows direct selection/moving of each vertex) */}
+      {points.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 p-2 bg-[var(--color-bg)] rounded-[var(--radius-card)] border border-black/10">
+          <span className="text-[11px] font-medium text-[var(--color-text)]/70 flex items-center gap-1 mr-1">
+            <Move size={12} />
+            Wierzchołki:
+          </span>
+          {points.map((p, idx) => {
+            const isSel = selectedIdx === idx
+            return (
+              <button
+                key={`chip-${idx}`}
+                type="button"
+                onClick={() => setSelectedIdx(isSel ? null : idx)}
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold border cursor-pointer transition-all ${
+                  isSel
+                    ? 'bg-amber-500 text-white border-amber-600 shadow-xs'
+                    : 'bg-white text-[var(--color-text)] border-black/15 hover:bg-black/5'
+                }`}
+                title={`Kliknij, aby wybrać wierzchołek W${idx + 1} do przesunięcia`}
+              >
+                <span>W{idx + 1}</span>
+                <span className="text-[10px] font-normal opacity-75">
+                  ({p.lat.toFixed(3)}, {p.lng.toFixed(3)})
+                </span>
+              </button>
+            )
+          })}
+          {selectedIdx != null && (
+            <span className="text-[10px] text-amber-600 font-semibold ml-auto">
+              Przeciągaj lub kliknij w nowe miejsce
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Status Bar */}
       <div className="flex items-center justify-between px-3 py-2 bg-[var(--color-bg)] rounded-[var(--radius-card)] border border-black/10 text-xs">
