@@ -4,40 +4,48 @@ import { describe, expect, it, vi } from 'vitest'
 import App from './App'
 
 vi.mock('./map/MapCanvas', () => ({
-  MapCanvas: ({ className }: { className?: string }) => (
-    <div data-testid="map-canvas" className={className} aria-label="Mapa Krakowa" />
+  MapCanvas: ({
+    className,
+    onMapClick,
+  }: {
+    className?: string
+    onMapClick?: (point: { lat: number; lng: number }) => void
+  }) => (
+    <button
+      type="button"
+      data-testid="map-canvas"
+      className={className}
+      aria-label="Mapa Krakowa"
+      onClick={() => onMapClick?.({ lat: 50.07, lng: 19.91 })}
+    />
   ),
 }))
 
 describe('App shell', () => {
-  it('renders brand and navigation', () => {
+  it('renders brand, navigation and demo ideas', () => {
     render(<App />)
 
     expect(screen.getByRole('heading', { name: 'Sąsiedzki' })).toBeInTheDocument()
 
     const nav = screen.getByRole('navigation', { name: 'Nawigacja dolna' })
     expect(within(nav).getByText('Mapa')).toBeInTheDocument()
-    expect(within(nav).getByText('Powiadomienia')).toBeInTheDocument()
+    expect(screen.getByText('Zielony zakątek z ławkami')).toBeInTheDocument()
   })
 
-  it('shows Kraków map screen with layer tabs', () => {
+  it('shows land card after map click on a demo point', async () => {
+    const user = userEvent.setup()
     render(<App />)
 
-    expect(screen.getByTestId('map-canvas')).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Pomysły' })).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByRole('tab', { name: 'Usterki' })).toBeInTheDocument()
-    expect(screen.getByText('Ławka przy skwerze')).toBeInTheDocument()
+    await user.click(screen.getByTestId('map-canvas'))
+    expect(await screen.findByLabelText('Karta terenu')).toBeInTheDocument()
+    expect(screen.getByText(/Scenariusz demonstracyjny/i)).toBeInTheDocument()
   })
 
-  it('switches to faults layer and placeholder tabs', async () => {
+  it('switches to faults layer', async () => {
     const user = userEvent.setup()
     render(<App />)
 
     await user.click(screen.getByRole('tab', { name: 'Usterki' }))
-    expect(screen.getByText('Uszkodzona nawierzchnia')).toBeInTheDocument()
-
-    const nav = screen.getByRole('navigation', { name: 'Nawigacja dolna' })
-    await user.click(within(nav).getByRole('button', { name: 'Dodaj' }))
-    expect(screen.getByRole('heading', { name: 'Dodaj' })).toBeInTheDocument()
+    expect(screen.getByText('Uszkodzona ławka')).toBeInTheDocument()
   })
 })
