@@ -1,16 +1,22 @@
 /**
- * Edge Function stub for generate-application.
- * Deploy with: supabase functions deploy generate-application
- * Set secret OPENAI_API_KEY for live mode; without it returns mock-compatible payload.
+ * Edge Function: generate-application (role C)
  *
- * Contract mirrors src/applications/api.ts (author, threshold, max 3 gens, catalog costs).
+ * Deploy:
+ *   supabase functions deploy generate-application
+ * Secrets:
+ *   OPENAI_API_KEY — when set, use OpenAI; otherwise return { mode: 'mock' }
+ *     so the client falls back to mockGenerateApplication.
+ *
+ * Contract: author-only, threshold check, max 3 gens, max 20 comments,
+ * costs from catalog only, structured JSON (see src/applications/systemPrompt.ts).
  */
 import "jsr:@supabase/functions-js/edge-runtime.d.ts"
 import { createClient } from "jsr:@supabase/supabase-js@2"
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 }
 
 Deno.serve(async (req) => {
@@ -21,10 +27,7 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get("Authorization")
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...cors, "Content-Type": "application/json" },
-      })
+      return json({ error: "Unauthorized" }, 401)
     }
 
     const supabase = createClient(
@@ -36,69 +39,67 @@ Deno.serve(async (req) => {
     const {
       data: { user },
     } = await supabase.auth.getUser()
-    if (!user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...cors, "Content-Type": "application/json" },
-      })
-    }
+    if (!user) return json({ error: "Unauthorized" }, 401)
 
     const body = await req.json()
     const ideaId = body.ideaId as string
-    if (!ideaId) {
-      return new Response(JSON.stringify({ error: "ideaId required" }), {
-        status: 400,
-        headers: { ...cors, "Content-Type": "application/json" },
-      })
-    }
+    if (!ideaId) return json({ error: "ideaId required" }, 400)
 
     const { data: idea, error: ideaErr } = await supabase
       .from("ideas")
       .select("*")
       .eq("id", ideaId)
       .single()
-
-    if (ideaErr || !idea) {
-      return new Response(JSON.stringify({ error: "Idea not found" }), {
-        status: 404,
-        headers: { ...cors, "Content-Type": "application/json" },
-      })
-    }
-
-    if (idea.author_id !== user.id) {
-      return new Response(JSON.stringify({ error: "Only author" }), {
-        status: 403,
-        headers: { ...cors, "Content-Type": "application/json" },
-      })
-    }
-
+    if (ideaErr || !idea) return json({ error: "Idea not found" }, 404)
+    if (idea.author_id !== user.id) return json({ error: "Only author" }, 403)
     if (idea.likes_count < idea.support_threshold) {
-      return new Response(JSON.stringify({ error: "Threshold not met" }), {
-        status: 400,
-        headers: { ...cors, "Content-Type": "application/json" },
-      })
+      return json({ error: "Threshold not met" }, 400)
+    }
+
+    const { count } = await supabase
+      .from("applications")
+      .select("id", { count: "exact", head: true })
+      .eq("idea_id", ideaId)
+    if ((count ?? 0) >= 3) return json({ error: "Generation limit" }, 400)
+
+    const { data: inflight } = await supabase
+      .from("applications")
+      .select("id")
+      .eq("idea_id", ideaId)
+      .eq("generation_status", "generating")
+      .limit(1)
+    if (inflight && inflight.length > 0) {
+      return json({ error: "Generation in progress" }, 409)
     }
 
     const openaiKey = Deno.env.get("OPENAI_API_KEY")
-    const mode = openaiKey ? "openai" : "mock"
-
-    // Live OpenAI wiring is intentionally gated; client mock remains the default path.
-    return new Response(
-      JSON.stringify({
+    if (!openaiKey) {
+      return json({
         ok: true,
-        mode,
+        mode: "mock",
         message:
-          mode === "mock"
-            ? "No OPENAI_API_KEY — use client mockGenerateApplication or set the secret."
-            : "OpenAI key present — wire model call here (gpt-4.1-mini).",
+          "No OPENAI_API_KEY — client should use mockGenerateApplication.",
         ideaId,
-      }),
-      { headers: { ...cors, "Content-Type": "application/json" } },
-    )
-  } catch (err) {
-    return new Response(JSON.stringify({ error: String(err) }), {
-      status: 500,
-      headers: { ...cors, "Content-Type": "application/json" },
+      })
+    }
+
+    // Placeholder for live OpenAI Structured Outputs wiring.
+    // Until implemented, signal client to use mock to avoid inventing prices.
+    return json({
+      ok: true,
+      mode: "openai-pending",
+      message:
+        "OPENAI_API_KEY present. Wire Responses API + schema here; costs stay catalog-side.",
+      ideaId,
     })
+  } catch (err) {
+    return json({ error: String(err) }, 500)
   }
 })
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...cors, "Content-Type": "application/json" },
+  })
+}

@@ -310,7 +310,6 @@ export function ApplicationEditor({
               className="min-h-11 px-3 rounded-[var(--radius-card)] border border-black/10 bg-white text-sm cursor-pointer"
               onClick={() =>
                 withFeedback(async () => {
-                  const { listIdeaLikerIds } = await import('../ideas/likes')
                   const ids = await listIdeaLikerIds(application.idea_id)
                   await sendVotingReminderDemo({
                     recipientIds: ids.filter((id) => id !== user!.id),
