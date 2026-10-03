@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
+  Circle,
   CircleMarker,
   MapContainer,
   TileLayer,
@@ -8,12 +9,16 @@ import {
   useMapEvents,
 } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
-import { LocateFixed, MapPin, Maximize2 } from 'lucide-react'
+import { LocateFixed, MapPin, Maximize2, Sliders } from 'lucide-react'
 import { KRAKOW_CENTER, OSM_ATTRIBUTION, OSM_TILE_URL } from './krakow'
 
 export type LocationPickerProps = {
   value: { lat: number; lng: number }
   onChange: (point: { lat: number; lng: number }) => void
+  radiusM?: number
+  onRadiusChange?: (radius: number) => void
+  minRadius?: number
+  maxRadius?: number
   onGetGps?: () => void
   locating?: boolean
   onPickOnMainMap?: () => void
@@ -62,6 +67,10 @@ function MapInvalidateSize() {
 export function LocationPicker({
   value,
   onChange,
+  radiusM,
+  onRadiusChange,
+  minRadius = 50,
+  maxRadius = 2000,
   onGetGps,
   locating = false,
   onPickOnMainMap,
@@ -144,6 +153,21 @@ export function LocationPicker({
             <MapCenterSync center={{ lat: currentLat, lng: currentLng }} />
             <MapInvalidateSize />
 
+            {/* Radius circle around selected point (e.g. for interest areas) */}
+            {radiusM != null && radiusM > 0 && (
+              <Circle
+                center={[currentLat, currentLng]}
+                radius={radiusM}
+                pathOptions={{
+                  color: accentColor,
+                  fillColor: accentColor,
+                  fillOpacity: 0.15,
+                  weight: 2,
+                  dashArray: '4, 4',
+                }}
+              />
+            )}
+
             {/* Marker representing the selected pin */}
             <CircleMarker
               center={[currentLat, currentLng]}
@@ -167,7 +191,9 @@ export function LocationPicker({
               }}
             >
               <Tooltip permanent direction="top" offset={[0, -10]}>
-                <span className="text-[11px] font-semibold">Wybrane miejsce</span>
+                <span className="text-[11px] font-semibold">
+                  {radiusM != null && radiusM > 0 ? 'Środek okolicy' : 'Wybrane miejsce'}
+                </span>
               </Tooltip>
             </CircleMarker>
           </MapContainer>
@@ -184,9 +210,71 @@ export function LocationPicker({
             <span>
               {currentLat.toFixed(5)}, {currentLng.toFixed(5)}
             </span>
+            {radiusM != null && radiusM > 0 && (
+              <span className="text-[var(--color-text)]/70 font-sans">
+                · {radiusM >= 1000 ? `${(radiusM / 1000).toFixed(2)} km` : `${radiusM} m`}
+              </span>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Radius slider control when picking an area */}
+      {radiusM != null && onRadiusChange != null && (
+        <div className="p-3 bg-[var(--color-bg)] rounded-[var(--radius-card)] border border-black/10 space-y-2">
+          <div className="flex items-center justify-between text-xs font-medium">
+            <label
+              htmlFor="radius-slider"
+              className="flex items-center gap-1.5 text-[var(--color-text)] cursor-pointer"
+            >
+              <Sliders size={14} style={{ color: accentColor }} />
+              Promień obszaru:
+            </label>
+            <span className="font-mono text-sm font-semibold" style={{ color: accentColor }}>
+              {radiusM >= 1000 ? `${(radiusM / 1000).toFixed(2)} km` : `${radiusM} m`}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] text-[var(--color-text)]/60 font-mono">{minRadius} m</span>
+            <input
+              id="radius-slider"
+              type="range"
+              min={minRadius}
+              max={maxRadius}
+              step={25}
+              value={radiusM}
+              onChange={(e) => onRadiusChange(Number(e.target.value))}
+              className="flex-1 accent-[var(--color-action)] cursor-pointer h-2 bg-black/10 rounded-lg"
+              aria-label="Promień obszaru"
+            />
+            <span className="text-[11px] text-[var(--color-text)]/60 font-mono">
+              {maxRadius >= 1000 ? `${(maxRadius / 1000).toFixed(1)} km` : `${maxRadius} m`}
+            </span>
+          </div>
+
+          {/* Quick preset buttons */}
+          <div className="flex items-center gap-1.5 flex-wrap pt-1">
+            <span className="text-[11px] text-[var(--color-text)]/65 mr-1">Szybki wybór:</span>
+            {[100, 250, 500, 1000, 1500, 2000]
+              .filter((preset) => preset >= minRadius && preset <= maxRadius)
+              .map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => onRadiusChange(preset)}
+                  className={`px-2 py-0.5 text-xs rounded-md border transition-colors cursor-pointer ${
+                    radiusM === preset
+                      ? 'bg-[var(--color-action)] text-white border-transparent font-medium shadow-xs'
+                      : 'bg-white border-black/10 text-[var(--color-text)]/80 hover:bg-black/5'
+                  }`}
+                >
+                  {preset >= 1000 ? `${preset / 1000} km` : `${preset} m`}
+                </button>
+              ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

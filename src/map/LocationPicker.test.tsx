@@ -58,4 +58,31 @@ describe('LocationPicker', () => {
     await user.click(mapBtn)
     expect(onPickOnMainMap).toHaveBeenCalledOnce()
   })
+
+  it('renders radius slider and preset buttons when radiusM and onRadiusChange are provided', async () => {
+    const user = userEvent.setup()
+    const onRadiusChange = vi.fn()
+
+    render(
+      <LocationPicker
+        value={{ lat: 50.0614, lng: 19.9366 }}
+        onChange={vi.fn()}
+        radiusM={500}
+        onRadiusChange={onRadiusChange}
+        minRadius={50}
+        maxRadius={2000}
+      />,
+    )
+
+    const slider = screen.getByRole('slider', { name: /Promień obszaru/i })
+    expect(slider).toBeInTheDocument()
+    expect(slider).toHaveValue('500')
+    expect(screen.getAllByText('500 m').length).toBeGreaterThanOrEqual(1)
+
+    // Test quick preset buttons
+    const presetBtn = screen.getByRole('button', { name: '1 km' })
+    expect(presetBtn).toBeInTheDocument()
+    await user.click(presetBtn)
+    expect(onRadiusChange).toHaveBeenCalledWith(1000)
+  })
 })

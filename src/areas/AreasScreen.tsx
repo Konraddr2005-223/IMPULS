@@ -1,8 +1,9 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { MapPinned, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { getCurrentPosition } from '../lib/geolocation'
+import { LocationPicker } from '../map/LocationPicker'
 import { copy } from '../ui/copy'
 import {
   KRAKOW_DISTRICTS,
@@ -24,7 +25,28 @@ export function AreasScreen({ draftPoint }: AreasScreenProps) {
   const [radiusM, setRadiusM] = useState(500)
   const [lat, setLat] = useState(draftPoint?.lat ?? 50.06143)
   const [lng, setLng] = useState(draftPoint?.lng ?? 19.93658)
+  const [locating, setLocating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (draftPoint) {
+      setLat(draftPoint.lat)
+      setLng(draftPoint.lng)
+    }
+  }, [draftPoint])
+
+  async function handleGps() {
+    setLocating(true)
+    setError(null)
+    const pos = await getCurrentPosition()
+    setLocating(false)
+    if (!pos.ok) {
+      setError(copy.gpsDenied)
+      return
+    }
+    setLat(pos.lat)
+    setLng(pos.lng)
+  }
 
   const query = useQuery({
     queryKey: ['areas', user?.id],
@@ -110,68 +132,46 @@ export function AreasScreen({ draftPoint }: AreasScreenProps) {
         </div>
       </section>
 
-      <section className="rounded-[var(--radius-card)] bg-white p-4 border border-black/5 mb-4">
+      <section className="rounded-[var(--radius-card)] bg-white p-4 border border-black/5 mb-4 space-y-3">
         <h3 className="m-0 text-sm font-semibold">Punkt i promień</h3>
-        <label className="mt-2 flex flex-col gap-1 text-sm">
-          Nazwa
+        <label className="flex flex-col gap-1 text-sm">
+          Nazwa okolicy
           <input
             value={radiusName}
             onChange={(e) => setRadiusName(e.target.value)}
-            className="min-h-11 px-3 rounded-[var(--radius-card)] border border-black/10"
+            placeholder="np. Moja okolica, Praca, Park"
+            className="min-h-11 px-3 rounded-[var(--radius-card)] border border-black/10 text-sm"
           />
         </label>
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          <label className="flex flex-col gap-1 text-sm">
-            Lat
-            <input
-              type="number"
-              step="any"
-              value={lat}
-              onChange={(e) => setLat(Number(e.target.value))}
-              className="min-h-11 px-3 rounded-[var(--radius-card)] border border-black/10"
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            Lng
-            <input
-              type="number"
-              step="any"
-              value={lng}
-              onChange={(e) => setLng(Number(e.target.value))}
-              className="min-h-11 px-3 rounded-[var(--radius-card)] border border-black/10"
-            />
-          </label>
-        </div>
-        <label className="mt-2 flex flex-col gap-1 text-sm">
-          Promień (m)
-          <input
-            type="number"
-            min={50}
-            max={2000}
-            value={radiusM}
-            onChange={(e) => setRadiusM(Number(e.target.value))}
-            className="min-h-11 px-3 rounded-[var(--radius-card)] border border-black/10"
-          />
-        </label>
-        <div className="mt-2 flex flex-wrap gap-2">
-          <button
-            type="button"
-            className="min-h-11 px-3 rounded-[var(--radius-card)] border border-black/10 bg-[var(--color-bg)] text-sm cursor-pointer"
-            onClick={async () => {
-              const pos = await getCurrentPosition()
-              if (!pos.ok) {
-                setError(copy.gpsDenied)
-                return
-              }
-              setLat(pos.lat)
-              setLng(pos.lng)
+
+        <div>
+          <LocationPicker
+            value={{ lat, lng }}
+            onChange={(pt) => {
+              setLat(pt.lat)
+              setLng(pt.lng)
             }}
-          >
-            Użyj GPS
-          </button>
+            radiusM={radiusM}
+            onRadiusChange={setRadiusM}
+            minRadius={50}
+            maxRadius={2000}
+            onGetGps={handleGps}
+            locating={locating}
+            accentColor="#176B4B"
+            label="Wskaż środek okolicy na mapie"
+            hint="Kliknij na mapie, aby ustawić centrum. Użyj suwaka poniżej, aby dobrać promień."
+          />
+        </div>
+
+        {/* Hidden inputs to preserve form semantics */}
+        <input type="hidden" name="lat" value={lat} />
+        <input type="hidden" name="lng" value={lng} />
+        <input type="hidden" name="radiusM" value={radiusM} />
+
+        <div className="flex justify-end pt-2">
           <button
             type="button"
-            className="min-h-11 px-3 rounded-[var(--radius-card)] border-0 text-white text-sm cursor-pointer"
+            className="min-h-11 px-5 rounded-[var(--radius-card)] border-0 text-white text-sm font-semibold cursor-pointer transition-opacity hover:opacity-90 shadow-sm"
             style={{ background: 'var(--color-action)' }}
             onClick={async () => {
               setError(null)
