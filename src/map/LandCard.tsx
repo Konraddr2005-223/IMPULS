@@ -7,6 +7,8 @@ type LandCardProps = {
   loading: boolean
   error: string | null
   onClose: () => void
+  onAddIdea?: () => void
+  onAddFault?: () => void
 }
 
 const assessmentConfig: Record<
@@ -39,7 +41,14 @@ const assessmentConfig: Record<
   },
 }
 
-export function LandCard({ assessment, loading, error, onClose }: LandCardProps) {
+export function LandCard({
+  assessment,
+  loading,
+  error,
+  onClose,
+  onAddIdea,
+  onAddFault,
+}: LandCardProps) {
   if (!loading && !assessment && !error) return null
 
   const config = assessment ? assessmentConfig[assessment.assessment] : null
@@ -194,6 +203,29 @@ export function LandCard({ assessment, loading, error, onClose }: LandCardProps)
               ? ` · plan: ${assessment.planningUpdatedAt}`
               : ''}
           </p>
+
+          {/* Action buttons to create idea or fault at this point */}
+          <div className="pt-2 border-t border-black/5 flex flex-col sm:flex-row gap-2">
+            {onAddIdea && (
+              <button
+                type="button"
+                onClick={onAddIdea}
+                className="flex-1 min-h-9 px-3 rounded-lg border-0 text-white text-xs font-semibold cursor-pointer shadow-xs flex items-center justify-center gap-1.5 hover:opacity-90 transition-opacity"
+                style={{ background: 'var(--color-ideas)' }}
+              >
+                Dodaj pomysł tutaj
+              </button>
+            )}
+            {onAddFault && (
+              <button
+                type="button"
+                onClick={onAddFault}
+                className="flex-1 min-h-9 px-3 rounded-lg border border-black/10 bg-white hover:bg-black/5 text-xs font-semibold cursor-pointer text-[var(--color-faults)] flex items-center justify-center gap-1.5 transition-colors"
+              >
+                Zgłoś usterkę tutaj
+              </button>
+            )}
+          </div>
 
           {/* Footer Disclaimer */}
           <div className="pt-2 border-t border-black/5 text-[11px] text-[var(--color-text)]/60 leading-tight">

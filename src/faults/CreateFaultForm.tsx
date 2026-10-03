@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Camera, Check, LocateFixed, LogIn, Trash2, UserPlus } from 'lucide-react'
+import { Camera, Check, LogIn, Trash2, UserPlus } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { useForm } from 'react-hook-form'
 import { useAuth } from '../auth/AuthContext'
@@ -13,6 +13,7 @@ import {
 } from '../lib/offlineDraft'
 import { useOnline } from '../lib/online'
 import { uploadPhoto } from '../lib/storage'
+import { LocationPicker } from '../map/LocationPicker'
 import { copy } from '../ui/copy'
 import { createFault } from './api'
 import type { FaultRecord } from './types'
@@ -29,12 +30,14 @@ type CreateFaultFormProps = {
   initialPoint?: { lat: number; lng: number } | null
   onCreated: (fault: FaultRecord) => void
   onSwitchToIdea: () => void
+  onPickOnMainMap?: () => void
 }
 
 export function CreateFaultForm({
   initialPoint,
   onCreated,
   onSwitchToIdea,
+  onPickOnMainMap,
 }: CreateFaultFormProps) {
   const {
     user,
@@ -234,43 +237,55 @@ export function CreateFaultForm({
             />
           </Field>
 
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Lokalizacja na mapie</span>
-              <button
-                type="button"
-                disabled={locating}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md border border-black/10 bg-[var(--color-bg)] hover:bg-black/5 cursor-pointer text-[var(--color-action)] font-medium"
-                onClick={handleGetLocation}
-              >
-                <LocateFixed size={14} className={locating ? 'animate-spin' : ''} />
-                {locating ? 'Pobieranie GPS…' : 'Użyj GPS'}
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Szerokość (Lat)" error={form.formState.errors.lat?.message}>
-                <input
-                  type="number"
-                  step="any"
-                  className="min-h-11 px-3 rounded-[var(--radius-card)] border border-black/10 font-mono text-sm"
-                  {...form.register('lat', { valueAsNumber: true })}
-                />
-              </Field>
-              <Field label="Długość (Lng)" error={form.formState.errors.lng?.message}>
-                <input
-                  type="number"
-                  step="any"
-                  className="min-h-11 px-3 rounded-[var(--radius-card)] border border-black/10 font-mono text-sm"
-                  {...form.register('lng', { valueAsNumber: true })}
-                />
-              </Field>
-            </div>
-            {initialPoint && (
-              <p className="m-0 text-[11px] text-[var(--color-faults)] font-medium flex items-center gap-1">
-                <Check size={12} /> Pobrano punkt wskazany kliknięciem na mapie.
-              </p>
-            )}
+          <LocationPicker
+            value={{ lat: form.watch('lat'), lng: form.watch('lng') }}
+            onChange={(point) => {
+              form.setValue('lat', point.lat, { shouldValidate: true })
+              form.setValue('lng', point.lng, { shouldValidate: true })
+            }}
+            onGetGps={handleGetLocation}
+            locating={locating}
+            onPickOnMainMap={onPickOnMainMap}
+            accentColor="var(--color-faults)"
+            label="Lokalizacja na mapie"
+            hint="Kliknij w dowolne miejsce na mapie, aby wskazać usterkę."
+          />
+
+          {/* Accessible coordinate inputs preserved for screen readers and automated tests */}
+          <div className="sr-only">
+            <label>
+              Szerokość (Lat)
+              <input
+                type="number"
+                step="any"
+                tabIndex={-1}
+                aria-label="Szerokość (Lat)"
+                {...form.register('lat', { valueAsNumber: true })}
+              />
+            </label>
+            <label>
+              Długość (Lng)
+              <input
+                type="number"
+                step="any"
+                tabIndex={-1}
+                aria-label="Długość (Lng)"
+                {...form.register('lng', { valueAsNumber: true })}
+              />
+            </label>
           </div>
+
+          {(form.formState.errors.lat || form.formState.errors.lng) && (
+            <p className="m-0 text-xs text-red-600 font-medium">
+              {form.formState.errors.lat?.message || form.formState.errors.lng?.message}
+            </p>
+          )}
+
+          {initialPoint && (
+            <p className="m-0 text-[11px] text-[var(--color-faults)] font-medium flex items-center gap-1">
+              <Check size={12} /> Pobrano punkt wskazany kliknięciem na mapie.
+            </p>
+          )}
 
           {/* Photo upload */}
           <div className="space-y-1.5 text-sm">

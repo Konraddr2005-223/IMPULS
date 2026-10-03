@@ -358,12 +358,24 @@ function App() {
               void handleMapClick(point)
             }}
             onThresholdSaved={() => void qc.invalidateQueries({ queryKey: ['ideas'] })}
+            onAddIdeaAtPoint={() => {
+              setAddKind('idea')
+              setTab('dodaj')
+            }}
+            onAddFaultAtPoint={() => {
+              setAddKind('fault')
+              setTab('dodaj')
+            }}
           />
         )}
         {tab === 'dodaj' && addKind === 'idea' && (
           <CreateIdeaForm
             initialPoint={draftPoint}
             onSwitchToFault={() => setAddKind('fault')}
+            onPickOnMainMap={() => {
+              setTab('mapa')
+              setMode('mapa')
+            }}
             onCreated={() => {
               void qc.invalidateQueries({ queryKey: ['ideas'] })
               setLayer('pomysly')
@@ -375,6 +387,10 @@ function App() {
           <CreateFaultForm
             initialPoint={draftPoint}
             onSwitchToIdea={() => setAddKind('idea')}
+            onPickOnMainMap={() => {
+              setTab('mapa')
+              setMode('mapa')
+            }}
             onCreated={() => {
               void qc.invalidateQueries({ queryKey: ['faults'] })
               setLayer('usterki')
@@ -512,6 +528,8 @@ type MapScreenProps = {
   onCancelPrepare: () => void
   onConfirmPrepare: (items: CostLineDraft[]) => void
   onThresholdSaved: () => void
+  onAddIdeaAtPoint?: () => void
+  onAddFaultAtPoint?: () => void
 }
 
 function MapScreen({
@@ -558,6 +576,8 @@ function MapScreen({
   onCancelPrepare,
   onConfirmPrepare,
   onThresholdSaved,
+  onAddIdeaAtPoint,
+  onAddFaultAtPoint,
 }: MapScreenProps) {
   const topIdeaIds = useMemo(() => {
     const list = ideas ?? demoIdeas
@@ -1017,6 +1037,8 @@ function MapScreen({
               loading={landLoading}
               error={landError}
               onClose={onCloseLand}
+              onAddIdea={onAddIdeaAtPoint}
+              onAddFault={onAddFaultAtPoint}
             />
           )}
 

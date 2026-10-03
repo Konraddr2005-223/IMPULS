@@ -77,4 +77,26 @@ describe('LandCard', () => {
     await user.click(screen.getByLabelText('Zamknij kartę terenu'))
     expect(onClose).toHaveBeenCalledOnce()
   })
+
+  it('triggers onAddIdea and onAddFault when clicked', async () => {
+    const user = userEvent.setup()
+    const onAddIdea = vi.fn()
+    const onAddFault = vi.fn()
+    render(
+      <LandCard
+        assessment={mockSyntheticAssessment}
+        loading={false}
+        error={null}
+        onClose={vi.fn()}
+        onAddIdea={onAddIdea}
+        onAddFault={onAddFault}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: /Dodaj pomysł tutaj/i }))
+    expect(onAddIdea).toHaveBeenCalledOnce()
+
+    await user.click(screen.getByRole('button', { name: /Zgłoś usterkę tutaj/i }))
+    expect(onAddFault).toHaveBeenCalledOnce()
+  })
 })
