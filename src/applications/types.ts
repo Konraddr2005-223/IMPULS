@@ -10,7 +10,7 @@ export type ApplicationContent = {
   missingInformation: string[]
   warnings: string[]
   usedCommentIds: string[]
-  generator: 'mock'
+  generator: 'mock' | 'openai'
 }
 
 export type ApplicationRecord = {

@@ -32,3 +32,19 @@ export async function fetchMyLikedIdeaIds(userId: string): Promise<Set<string>> 
   if (error) throw error
   return new Set((data ?? []).map((row) => row.idea_id as string))
 }
+
+export async function listIdeaLikerIds(ideaId: string): Promise<string[]> {
+  if (!supabase) return []
+  const { data, error } = await supabase.rpc('list_idea_liker_ids', {
+    p_idea_id: ideaId,
+  })
+  if (error) {
+    const fb = await supabase
+      .from('idea_likes')
+      .select('user_id')
+      .eq('idea_id', ideaId)
+    if (fb.error) throw fb.error
+    return (fb.data ?? []).map((r) => r.user_id as string)
+  }
+  return (data ?? []).map((r: { user_id: string }) => r.user_id)
+}

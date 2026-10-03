@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { setLike, fetchMyLikedIdeaIds } from './likes'
+import { setLike, listIdeaLikerIds, fetchMyLikedIdeaIds } from './likes'
 
-describe('likes API surface', () => {
-  it('exports setLike and fetchMyLikedIdeaIds', () => {
+describe('likes API (role B)', () => {
+  it('exports idempotent like helpers', () => {
     expect(typeof setLike).toBe('function')
+    expect(typeof listIdeaLikerIds).toBe('function')
     expect(typeof fetchMyLikedIdeaIds).toBe('function')
   })
 })

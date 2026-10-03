@@ -76,7 +76,11 @@ export function NotificationsScreen() {
               )}
             </div>
             <p className="mt-1 mb-0 text-sm text-[var(--color-text)]/75">
-              {String((n.payload as { title?: string }).title ?? n.event_key)}
+              {String(
+                (n.payload as { message?: string; title?: string }).message ??
+                  (n.payload as { title?: string }).title ??
+                  n.event_key,
+              )}
             </p>
             <p className="mt-1 mb-0 text-xs text-[var(--color-text)]/50">
               {new Date(n.created_at).toLocaleString('pl-PL')}
@@ -94,6 +98,7 @@ function labelFor(type: string) {
   if (type === 'application_summary') return 'Autor przygotował projekt wniosku'
   if (type === 'submitted') return 'Autor zgłosił złożenie projektu'
   if (type === 'signatures') return 'Autor deklaruje zebranie podpisów'
+  if (type === 'voting_reminder') return 'Przypomnienie o głosowaniu (demo)'
   return type
 }
 

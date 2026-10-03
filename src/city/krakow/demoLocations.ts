@@ -67,7 +67,8 @@ export const demoLocations: DemoLocation[] = [
     planningLabel: 'ZP',
     planName: 'Demo — Krowodrza',
     assessment: 'likely_suitable',
-    scenarioDescription: 'Park kieszonkowy — grunt gminny.',
+    scenarioDescription:
+      'presentation-B: grunt gminny, brak wykrytej przeszkody w danych demo (Zielony zakątek).',
     sourceMode: 'synthetic_demo',
     checkedAt: '2026-10-03',
   },
@@ -80,7 +81,8 @@ export const demoLocations: DemoLocation[] = [
     planningLabel: 'MW',
     planName: 'Demo — Piasek',
     assessment: 'requires_review',
-    scenarioDescription: 'Inny podmiot — wymaga weryfikacji urzędu.',
+    scenarioDescription:
+      'presentation-A: teren innego podmiotu — ostrzeżenie (scenariusz problematycznego gruntu).',
     sourceMode: 'synthetic_demo',
     checkedAt: '2026-10-03',
   },

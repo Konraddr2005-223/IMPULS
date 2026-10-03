@@ -1,6 +1,10 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { ApplicationEditor } from './applications/ApplicationEditor'
+import {
+  PrepareApplicationForm,
+  type CostLineDraft,
+} from './applications/PrepareApplicationForm'
 import { generateAndSaveApplication } from './applications/api'
 import type { ApplicationRecord } from './applications/types'
 import { AreasScreen } from './areas/AreasScreen'
@@ -60,6 +64,10 @@ function App() {
   const [selectedIdeaId, setSelectedIdeaId] = useState<string | null>(null)
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set())
   const [application, setApplication] = useState<ApplicationRecord | null>(null)
+  const [prepareOpen, setPrepareOpen] = useState(false)
+  const [prepareComments, setPrepareComments] = useState<CommentRecord[]>([])
+  const [generateBusy, setGenerateBusy] = useState(false)
+  const [generateError, setGenerateError] = useState<string | null>(null)
 
   const ideasQuery = useQuery({
     queryKey: ['ideas'],
@@ -132,22 +140,32 @@ function App() {
     }
   }
 
-  async function handleGenerate(idea: IdeaRecord, comments: CommentRecord[]) {
+  async function handleGenerate(
+    idea: IdeaRecord,
+    comments: CommentRecord[],
+    costItems: CostLineDraft[],
+  ) {
     if (!user) throw new Error('Wymagane logowanie.')
-    const landNote = land
-      ? `Ocena terenu: ${land.assessment}${land.scenarioDescription ? ` — ${land.scenarioDescription}` : ''}`
-      : undefined
-    const doc = await generateAndSaveApplication({
-      idea,
-      authorId: user.id,
-      selectedComments: comments.map((c) => ({ id: c.id, body: c.body })),
-      costItems: [
-        { catalogId: 'bench_backrest_installation', quantity: 2 },
-        { catalogId: 'tree_16_18_planting', quantity: 4 },
-      ],
-      landNote,
-    })
-    setApplication(doc)
+    setGenerateBusy(true)
+    setGenerateError(null)
+    try {
+      const landNote = land
+        ? `Ocena terenu: ${land.assessment}${land.scenarioDescription ? ` — ${land.scenarioDescription}` : ''}`
+        : undefined
+      const doc = await generateAndSaveApplication({
+        idea,
+        authorId: user.id,
+        selectedComments: comments.map((c) => ({ id: c.id, body: c.body })),
+        costItems,
+        landNote,
+      })
+      setPrepareOpen(false)
+      setApplication(doc)
+    } catch (err) {
+      setGenerateError(err instanceof Error ? err.message : 'Generowanie nie powiodło się.')
+    } finally {
+      setGenerateBusy(false)
+    }
   }
 
   const selectedIdea =
@@ -229,11 +247,22 @@ function App() {
             onCheckLandForIdea={(idea) => {
               void handleMapClick({ lat: idea.lat, lng: idea.lng })
             }}
-            onGenerate={(comments) =>
-              selectedIdea
-                ? handleGenerate(selectedIdea, comments)
-                : Promise.reject(new Error('Brak pomysłu'))
-            }
+            onPrepareApplication={(comments) => {
+              setPrepareComments(comments)
+              setPrepareOpen(true)
+              setGenerateError(null)
+            }}
+            prepareOpen={prepareOpen}
+            generateBusy={generateBusy}
+            generateError={generateError}
+            onCancelPrepare={() => {
+              setPrepareOpen(false)
+              setGenerateError(null)
+            }}
+            onConfirmPrepare={(items) => {
+              if (!selectedIdea) return
+              void handleGenerate(selectedIdea, prepareComments, items)
+            }}
             onThresholdSaved={() => void qc.invalidateQueries({ queryKey: ['ideas'] })}
           />
         )}
@@ -370,7 +399,12 @@ type MapScreenProps = {
   onLikeToggle: (ideaId: string, liked: boolean) => Promise<void>
   onCloseLand: () => void
   onCheckLandForIdea: (idea: IdeaRecord) => void
-  onGenerate: (comments: CommentRecord[]) => Promise<void>
+  onPrepareApplication: (comments: CommentRecord[]) => void
+  prepareOpen: boolean
+  generateBusy: boolean
+  generateError: string | null
+  onCancelPrepare: () => void
+  onConfirmPrepare: (items: CostLineDraft[]) => void
   onThresholdSaved: () => void
 }
 
@@ -399,7 +433,12 @@ function MapScreen({
   onLikeToggle,
   onCloseLand,
   onCheckLandForIdea,
-  onGenerate,
+  onPrepareApplication,
+  prepareOpen,
+  generateBusy,
+  generateError,
+  onCancelPrepare,
+  onConfirmPrepare,
   onThresholdSaved,
 }: MapScreenProps) {
   const topIdeaIds = useMemo(() => {
@@ -608,7 +647,23 @@ function MapScreen({
               onMapClick({ lat: marker.lat, lng: marker.lng })
             }}
           />
-          {selectedIdea && !land && !landLoading ? (
+          {prepareOpen && selectedIdea ? (
+            <>
+              <PrepareApplicationForm
+                busy={generateBusy}
+                onCancel={onCancelPrepare}
+                onConfirm={onConfirmPrepare}
+              />
+              {generateError && (
+                <p
+                  className="absolute left-3 right-3 md:left-auto md:right-4 md:w-[400px] bottom-[calc(4rem+40vh)] z-20 m-0 p-2 rounded-[var(--radius-card)] bg-white border text-sm"
+                  style={{ color: 'var(--color-faults)' }}
+                >
+                  {generateError}
+                </p>
+              )}
+            </>
+          ) : selectedIdea && !land && !landLoading ? (
             <IdeaDetailCard
               idea={selectedIdea}
               liked={likedIds.has(selectedIdea.id)}
@@ -618,7 +673,7 @@ function MapScreen({
               onLikeToggle={(liked) => onLikeToggle(selectedIdea.id, liked)}
               onClose={onCloseIdea}
               onCheckLand={() => onCheckLandForIdea(selectedIdea)}
-              onGenerate={onGenerate}
+              onPrepareApplication={onPrepareApplication}
               onThresholdSaved={onThresholdSaved}
             />
           ) : (

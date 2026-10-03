@@ -53,6 +53,8 @@ export const costCatalog: CostCatalog = {
   sourceUrl: 'https://plikimpi.krakow.pl/zalacznik/546216',
   sourceLabel: 'Miejski cennik BO Kraków (zakresy źródłowe)',
   checkedAt: '2026-10-03',
+  taxNote:
+    'Zakresy z cennika miejskiego. Nie dopisujemy arbitralnie VAT — netto/brutto wg źródła lub brak informacji.',
   items: [
     {
       id: 'bench_backrest_installation',
@@ -60,6 +62,7 @@ export const costCatalog: CostCatalog = {
       unit: 'szt.',
       minPln: 1897.5,
       maxPln: 4950,
+      scopeNote: 'Zakup + montaż wg pozycji cennika',
     },
     {
       id: 'tree_16_18_planting',
@@ -67,6 +70,7 @@ export const costCatalog: CostCatalog = {
       unit: 'szt.',
       minPln: 1500,
       maxPln: 1700,
+      scopeNote: 'Materiał + posadzenie',
     },
     {
       id: 'bin_50l_installation',
@@ -74,6 +78,7 @@ export const costCatalog: CostCatalog = {
       unit: 'szt.',
       minPln: 1000,
       maxPln: 2000,
+      scopeNote: 'Zakup + montaż',
     },
     {
       id: 'bike_rack',

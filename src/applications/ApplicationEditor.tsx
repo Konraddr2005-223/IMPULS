@@ -1,34 +1,54 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { listIdeaLikerIds } from '../ideas/likes'
 import { useAuth } from '../auth/AuthContext'
 import { krakowAdapter } from '../city'
+import { sendVotingReminderDemo } from '../notifications/votingReminder'
 import { copy } from '../ui/copy'
+import { saveApplicationContent } from './api'
 import { calculateCosts, formatPlnRange } from './costs'
 import {
   publishApplicationSummary,
   reportSignatures,
   reportSubmission,
 } from './reports'
-import type { ApplicationRecord } from './types'
+import type { ApplicationContent, ApplicationRecord } from './types'
+import { validateApplicationContent } from './validateContent'
 
 type ApplicationEditorProps = {
   application: ApplicationRecord
   ideaTitle?: string
   onClose: () => void
+  onSaved?: (app: ApplicationRecord) => void
 }
 
 export function ApplicationEditor({
-  application,
+  application: initial,
   ideaTitle = 'Pomysł',
   onClose,
+  onSaved,
 }: ApplicationEditorProps) {
   const { user } = useAuth()
-  const content = application.content_json
-  const instructions = krakowAdapter.getSubmissionInstructions()
-  const [officialId, setOfficialId] = useState(
-    application.official_project_id ?? '',
+  const [application, setApplication] = useState(initial)
+  const [content, setContent] = useState<ApplicationContent | null>(
+    initial.content_json,
   )
+  const instructions = krakowAdapter.getSubmissionInstructions()
+  const template = krakowAdapter.getApplicationTemplate()
+  const catalog = krakowAdapter.getCostCatalog()
+  const [officialId, setOfficialId] = useState(initial.official_project_id ?? '')
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  const validation = useMemo(
+    () => (content ? validateApplicationContent(content) : null),
+    [content],
+  )
+  const costs = content ? calculateCosts(content.costItems) : null
+  const isAuthor = user?.id === application.author_id
+  const titleMax = template.fields.find((f) => f.id === 'title')?.maxLength ?? 60
+  const summaryMin = template.fields.find((f) => f.id === 'summary')?.minLength ?? 60
+  const summaryMax = template.fields.find((f) => f.id === 'summary')?.maxLength ?? 250
 
   if (!content) {
     return (
@@ -41,8 +61,9 @@ export function ApplicationEditor({
     )
   }
 
-  const costs = calculateCosts(content.costItems)
-  const isAuthor = user?.id === application.author_id
+  function patch<K extends keyof ApplicationContent>(key: K, value: ApplicationContent[K]) {
+    setContent((prev) => (prev ? { ...prev, [key]: value } : prev))
+  }
 
   async function withFeedback(fn: () => Promise<void>) {
     setError(null)
@@ -78,28 +99,64 @@ export function ApplicationEditor({
         </div>
       </div>
 
-      <p className="mt-0 mb-3 text-sm text-[var(--color-text)]/70 print:hidden">
+      <p className="mt-0 mb-2 text-sm text-[var(--color-text)]/70 print:hidden">
         {copy.documentDisclaimer}
       </p>
       <p className="mt-0 mb-3 text-xs text-[var(--color-text)]/55 print:hidden">
-        {copy.templateStale}
+        {copy.templateStale} Generator: <strong>{content.generator}</strong> · model:{' '}
+        {application.model ?? '—'}.{' '}
+        {content.generator === 'mock'
+          ? 'Ujawnienie AI: treść powstała lokalnym szablonem mock (bez OpenAI).'
+          : 'Ujawnienie AI: treść wygenerowana modelem OpenAI; koszty z katalogu miejskiego.'}
       </p>
 
       <article
         className="rounded-[var(--radius-card)] bg-white p-5 border border-black/5 print:border-0"
         aria-label="Treść wniosku"
       >
-        <p className="m-0 text-xs text-[var(--color-text)]/60">
-          {content.warnings.join(' · ')} · status: {application.generation_status} · model:{' '}
-          {application.model}
-        </p>
-        <h1 className="mt-3 mb-2 text-xl font-semibold">{content.title}</h1>
-        <p className="mt-0 text-sm">{content.summary}</p>
+        <label className="flex flex-col gap-1 text-sm print:hidden">
+          Tytuł ({content.title.length}/{titleMax})
+          <input
+            value={content.title}
+            maxLength={titleMax}
+            disabled={!isAuthor}
+            onChange={(e) => patch('title', e.target.value)}
+            className="min-h-11 px-3 rounded-[var(--radius-card)] border border-black/10"
+          />
+        </label>
+        <h1 className="mt-3 mb-2 text-xl font-semibold hidden print:block">{content.title}</h1>
 
-        <Section title="Lokalizacja">{content.location}</Section>
-        <Section title="Opis szczegółowy">{content.description}</Section>
-        <Section title="Uzasadnienie">{content.justification}</Section>
-        <Section title="Ogólnodostępność">{content.accessibility}</Section>
+        <label className="mt-3 flex flex-col gap-1 text-sm">
+          Krótki opis ({content.summary.length}/{summaryMax}, min {summaryMin})
+          <textarea
+            rows={3}
+            value={content.summary}
+            maxLength={summaryMax}
+            disabled={!isAuthor}
+            onChange={(e) => patch('summary', e.target.value)}
+            className="px-3 py-2 rounded-[var(--radius-card)] border border-black/10 resize-y print:border-0"
+          />
+        </label>
+
+        {(
+          [
+            ['location', 'Lokalizacja'],
+            ['description', 'Opis szczegółowy'],
+            ['justification', 'Uzasadnienie'],
+            ['accessibility', 'Ogólnodostępność'],
+          ] as const
+        ).map(([key, label]) => (
+          <label key={key} className="mt-3 flex flex-col gap-1 text-sm">
+            {label}
+            <textarea
+              rows={key === 'description' ? 4 : 2}
+              value={content[key]}
+              disabled={!isAuthor}
+              onChange={(e) => patch(key, e.target.value)}
+              className="px-3 py-2 rounded-[var(--radius-card)] border border-black/10 resize-y"
+            />
+          </label>
+        ))}
 
         <h3 className="mt-4 mb-2 text-sm font-semibold">Harmonogram</h3>
         <ul className="m-0 pl-5 text-sm">
@@ -110,23 +167,36 @@ export function ApplicationEditor({
           ))}
         </ul>
 
-        <h3 className="mt-4 mb-2 text-sm font-semibold">Kosztorys (katalog)</h3>
-        <ul className="m-0 pl-5 text-sm">
-          {costs.lines.map((line) => (
-            <li key={line.catalogId}>
-              {line.quantity} × {line.label}: {formatPlnRange(line.lineMinPln, line.lineMaxPln)}
-            </li>
-          ))}
-        </ul>
-        <p className="mt-2 mb-0 text-sm font-medium">
-          Rozpoznane pozycje: {formatPlnRange(costs.totalMinPln, costs.totalMaxPln)}.{' '}
-          {costs.disclaimer}
-        </p>
+        {costs && (
+          <>
+            <h3 className="mt-4 mb-2 text-sm font-semibold">Kosztorys (katalog)</h3>
+            <ul className="m-0 pl-5 text-sm">
+              {costs.lines.map((line) => (
+                <li key={line.catalogId}>
+                  {line.quantity} × {line.label}:{' '}
+                  {formatPlnRange(line.lineMinPln, line.lineMaxPln)}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 mb-0 text-sm font-medium">
+              Rozpoznane pozycje: {formatPlnRange(costs.totalMinPln, costs.totalMaxPln)}.{' '}
+              {costs.disclaimer}
+            </p>
+            <p className="mt-1 mb-0 text-xs text-[var(--color-text)]/60">{catalog.taxNote}</p>
+          </>
+        )}
 
         <h3 className="mt-4 mb-2 text-sm font-semibold">Braki informacji</h3>
         <ul className="m-0 pl-5 text-sm">
           {content.missingInformation.map((item) => (
             <li key={item}>{item}</li>
+          ))}
+        </ul>
+
+        <h3 className="mt-4 mb-2 text-sm font-semibold">Ostrzeżenia</h3>
+        <ul className="m-0 pl-5 text-sm">
+          {content.warnings.map((w) => (
+            <li key={w}>{w}</li>
           ))}
         </ul>
 
@@ -137,21 +207,43 @@ export function ApplicationEditor({
             <li key={step}>{step}</li>
           ))}
         </ol>
-        <p className="mt-2 mb-0 text-sm">
-          <a href={instructions.officialFormUrl} target="_blank" rel="noreferrer">
-            Oficjalny system BO
-          </a>
-          {' · '}
-          <a href={instructions.signatureListUrl} target="_blank" rel="noreferrer">
-            Listy poparcia
-          </a>
-        </p>
       </article>
+
+      {validation && !validation.ok && (
+        <ul className="mt-3 text-sm" style={{ color: 'var(--color-faults)' }}>
+          {validation.errors.map((e) => (
+            <li key={e}>{e}</li>
+          ))}
+        </ul>
+      )}
 
       {isAuthor && (
         <section className="mt-4 rounded-[var(--radius-card)] bg-white p-4 border border-black/5 print:hidden">
-          <h3 className="m-0 text-sm font-semibold">Deklaracje autora</h3>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={saving || (validation ? !validation.ok : true)}
+              className="min-h-11 px-3 rounded-[var(--radius-card)] border-0 text-white text-sm cursor-pointer disabled:opacity-50"
+              style={{ background: 'var(--color-ideas)' }}
+              onClick={() =>
+                withFeedback(async () => {
+                  setSaving(true)
+                  try {
+                    const saved = await saveApplicationContent(
+                      application.id,
+                      user!.id,
+                      content,
+                    )
+                    setApplication(saved)
+                    onSaved?.(saved)
+                  } finally {
+                    setSaving(false)
+                  }
+                })
+              }
+            >
+              Zapisz poprawki
+            </button>
             <button
               type="button"
               className="min-h-11 px-3 rounded-[var(--radius-card)] border border-black/10 bg-[var(--color-bg)] text-sm cursor-pointer"
@@ -162,14 +254,14 @@ export function ApplicationEditor({
                     user!.id,
                     application.idea_id,
                     ideaTitle,
-                    [user!.id],
                   ),
                 )
               }
             >
-              Opublikuj streszczenie
+              Opublikuj streszczenie → sąsiedzi
             </button>
           </div>
+
           <label className="mt-3 flex flex-col gap-1 text-sm">
             Oficjalny numer projektu
             <input
@@ -191,12 +283,11 @@ export function ApplicationEditor({
                     officialId,
                     application.idea_id,
                     ideaTitle,
-                    [user!.id],
                   ),
                 )
               }
             >
-              Zgłoś złożenie w systemie miasta
+              Zgłoś złożenie
             </button>
             <button
               type="button"
@@ -208,12 +299,28 @@ export function ApplicationEditor({
                     user!.id,
                     application.idea_id,
                     ideaTitle,
-                    [user!.id],
                   ),
                 )
               }
             >
-              Zadeklaruj zebranie podpisów
+              Zadeklaruj podpisy
+            </button>
+            <button
+              type="button"
+              className="min-h-11 px-3 rounded-[var(--radius-card)] border border-black/10 bg-white text-sm cursor-pointer"
+              onClick={() =>
+                withFeedback(async () => {
+                  const { listIdeaLikerIds } = await import('../ideas/likes')
+                  const ids = await listIdeaLikerIds(application.idea_id)
+                  await sendVotingReminderDemo({
+                    recipientIds: ids.filter((id) => id !== user!.id),
+                    ideaId: application.idea_id,
+                    ideaTitle,
+                  })
+                })
+              }
+            >
+              Demo: przypomnienie o głosowaniu
             </button>
           </div>
           {message && (
@@ -229,14 +336,5 @@ export function ApplicationEditor({
         </section>
       )}
     </div>
-  )
-}
-
-function Section({ title, children }: { title: string; children: string }) {
-  return (
-    <>
-      <h3 className="mt-4 mb-1 text-sm font-semibold">{title}</h3>
-      <p className="m-0 text-sm whitespace-pre-wrap">{children}</p>
-    </>
   )
 }

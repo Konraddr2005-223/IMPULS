@@ -58,6 +58,7 @@ export type CostCatalogItem = {
   unit: string
   minPln: number
   maxPln: number
+  scopeNote?: string
 }
 
 export type CostCatalog = {
@@ -65,6 +66,7 @@ export type CostCatalog = {
   sourceUrl: string
   sourceLabel: string
   checkedAt: string
+  taxNote: string
   items: CostCatalogItem[]
 }
 

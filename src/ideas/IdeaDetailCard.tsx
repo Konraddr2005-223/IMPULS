@@ -14,7 +14,7 @@ type IdeaDetailCardProps = {
   onLikeToggle: (liked: boolean) => Promise<void>
   onClose: () => void
   onCheckLand: () => void
-  onGenerate: (selectedComments: CommentRecord[]) => Promise<void>
+  onPrepareApplication: (selectedComments: CommentRecord[]) => void
   onThresholdSaved: () => void
 }
 
@@ -27,7 +27,7 @@ export function IdeaDetailCard({
   onLikeToggle,
   onClose,
   onCheckLand,
-  onGenerate,
+  onPrepareApplication,
   onThresholdSaved,
 }: IdeaDetailCardProps) {
   const [busy, setBusy] = useState(false)
@@ -36,7 +36,6 @@ export function IdeaDetailCard({
   const [commentBody, setCommentBody] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [threshold, setThreshold] = useState(idea.support_threshold)
-  const [generating, setGenerating] = useState(false)
 
   useEffect(() => {
     setThreshold(idea.support_threshold)
@@ -95,17 +94,10 @@ export function IdeaDetailCard({
     }
   }
 
-  async function generate() {
-    setGenerating(true)
+  function openPrepare() {
     setError(null)
-    try {
-      const chosen = comments.filter((c) => selected.has(c.id))
-      await onGenerate(chosen)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Generowanie nie powiodło się.')
-    } finally {
-      setGenerating(false)
-    }
+    const chosen = comments.filter((c) => selected.has(c.id))
+    onPrepareApplication(chosen)
   }
 
   return (
@@ -242,16 +234,14 @@ export function IdeaDetailCard({
       {isAuthor && (
         <button
           type="button"
-          onClick={generate}
-          disabled={generating || !reached}
+          onClick={openPrepare}
+          disabled={!reached}
           className="mt-4 w-full min-h-11 px-4 rounded-[var(--radius-card)] border-0 text-white text-sm font-medium cursor-pointer disabled:opacity-50"
           style={{ background: 'var(--color-ideas)' }}
         >
-          {generating
-            ? 'Generuję wniosek (mock)…'
-            : reached
-              ? 'Przygotuj wniosek BO (mock AI)'
-              : `Wniosek po osiągnięciu progu (${idea.likes_count}/${idea.support_threshold})`}
+          {reached
+            ? 'Przygotuj wniosek BO (zakres + AI)'
+            : `Wniosek po osiągnięciu progu (${idea.likes_count}/${idea.support_threshold})`}
         </button>
       )}
 

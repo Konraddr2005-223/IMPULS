@@ -40,6 +40,58 @@ export async function updateSupportThreshold(
   if (error) throw error
 }
 
+export async function updateIdea(
+  ideaId: string,
+  authorId: string,
+  patch: {
+    title?: string
+    description?: string
+    category?: string | null
+    districtCode?: string | null
+    lat?: number
+    lng?: number
+    supportThreshold?: number
+  },
+): Promise<IdeaRecord> {
+  if (!supabase) throw new Error('Supabase nie jest skonfigurowany.')
+
+  const { data: current, error: readErr } = await supabase
+    .from('ideas')
+    .select('revision')
+    .eq('id', ideaId)
+    .eq('author_id', authorId)
+    .single()
+  if (readErr) throw readErr
+
+  const update: Record<string, unknown> = {
+    revision: (current.revision as number) + 1,
+  }
+  if (patch.title !== undefined) update.title = patch.title.trim()
+  if (patch.description !== undefined) update.description = patch.description.trim()
+  if (patch.category !== undefined) update.category = patch.category
+  if (patch.districtCode !== undefined) {
+    update.district_code = patch.districtCode?.trim() || null
+  }
+  if (patch.supportThreshold !== undefined) {
+    update.support_threshold = patch.supportThreshold
+  }
+  if (patch.lat !== undefined && patch.lng !== undefined) {
+    update.location = pointWkt(patch.lat, patch.lng)
+  }
+
+  const { data, error } = await supabase
+    .from('ideas')
+    .update(update)
+    .eq('id', ideaId)
+    .eq('author_id', authorId)
+    .select(
+      'id, city_id, author_id, title, description, category, district_code, photo_path, support_threshold, likes_count, revision, status, lat, lng, created_at',
+    )
+    .single()
+  if (error) throw error
+  return data as IdeaRow
+}
+
 export async function createIdea(
   authorId: string,
   input: CreateIdeaInput & { photoPath?: string | null },

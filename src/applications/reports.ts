@@ -1,12 +1,17 @@
+import { listIdeaLikerIds } from '../ideas/likes'
 import { createNotification } from '../notifications/api'
 import { supabase } from '../lib/supabase'
+
+async function recipientsForIdea(ideaId: string, authorId: string) {
+  const likers = await listIdeaLikerIds(ideaId)
+  return [...new Set(likers.filter((id) => id !== authorId))]
+}
 
 export async function publishApplicationSummary(
   applicationId: string,
   authorId: string,
   ideaId: string,
   ideaTitle: string,
-  neighborIds: string[],
 ) {
   if (!supabase) throw new Error('Supabase nie jest skonfigurowany.')
 
@@ -17,7 +22,8 @@ export async function publishApplicationSummary(
     .eq('author_id', authorId)
   if (error) throw error
 
-  for (const recipientId of neighborIds) {
+  const recipients = await recipientsForIdea(ideaId, authorId)
+  for (const recipientId of recipients) {
     await createNotification({
       recipientId,
       ideaId,
@@ -37,9 +43,11 @@ export async function reportSubmission(
   officialProjectId: string,
   ideaId: string,
   ideaTitle: string,
-  recipientIds: string[],
 ) {
   if (!supabase) throw new Error('Supabase nie jest skonfigurowany.')
+  if (!officialProjectId.trim()) {
+    throw new Error('Podaj oficjalny numer projektu.')
+  }
 
   const { error } = await supabase
     .from('applications')
@@ -51,7 +59,8 @@ export async function reportSubmission(
     .eq('author_id', authorId)
   if (error) throw error
 
-  for (const recipientId of recipientIds) {
+  const recipients = await recipientsForIdea(ideaId, authorId)
+  for (const recipientId of recipients) {
     await createNotification({
       recipientId,
       ideaId,
@@ -71,7 +80,6 @@ export async function reportSignatures(
   authorId: string,
   ideaId: string,
   ideaTitle: string,
-  recipientIds: string[],
 ) {
   if (!supabase) throw new Error('Supabase nie jest skonfigurowany.')
 
@@ -82,7 +90,8 @@ export async function reportSignatures(
     .eq('author_id', authorId)
   if (error) throw error
 
-  for (const recipientId of recipientIds) {
+  const recipients = await recipientsForIdea(ideaId, authorId)
+  for (const recipientId of recipients) {
     await createNotification({
       recipientId,
       ideaId,

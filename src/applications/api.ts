@@ -4,7 +4,8 @@ import { supabase } from '../lib/supabase'
 import { hashInput, mockGenerateApplication } from './mockGenerate'
 import type { ApplicationContent, ApplicationRecord } from './types'
 
-const MAX_GENERATIONS_PER_IDEA = 3
+export const MAX_GENERATIONS_PER_IDEA = 3
+export const MAX_SELECTED_COMMENTS = 20
 
 export async function countGenerations(ideaId: string): Promise<number> {
   if (!supabase) return 0
@@ -33,6 +34,52 @@ export async function fetchLatestApplication(
   return (data as ApplicationRecord | null) ?? null
 }
 
+export async function saveApplicationContent(
+  applicationId: string,
+  authorId: string,
+  content: ApplicationContent,
+): Promise<ApplicationRecord> {
+  if (!supabase) throw new Error('Supabase nie jest skonfigurowany.')
+  const { data, error } = await supabase
+    .from('applications')
+    .update({
+      content_json: content,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', applicationId)
+    .eq('author_id', authorId)
+    .select(
+      'id, idea_id, author_id, idea_revision, template_version, model, prompt_version, input_hash, content_json, generation_status, generation_request_key, summary_published, official_project_id, submitted_at, signatures_reported_at, created_at, updated_at',
+    )
+    .single()
+  if (error) throw error
+  return data as ApplicationRecord
+}
+
+async function tryEdgeGenerate(input: {
+  idea: IdeaRecord
+  selectedComments: { id: string; body: string }[]
+  costItems: { catalogId: string; quantity: number }[]
+  landNote?: string
+}): Promise<ApplicationRecord | null> {
+  if (!supabase) return null
+  try {
+    const { data, error } = await supabase.functions.invoke('generate-application', {
+      body: {
+        ideaId: input.idea.id,
+        selectedComments: input.selectedComments.slice(0, MAX_SELECTED_COMMENTS),
+        costItems: input.costItems,
+        landNote: input.landNote,
+      },
+    })
+    if (error) return null
+    if (data?.application) return data.application as ApplicationRecord
+    return null
+  } catch {
+    return null
+  }
+}
+
 export async function generateAndSaveApplication(input: {
   idea: IdeaRecord
   authorId: string
@@ -49,15 +96,31 @@ export async function generateAndSaveApplication(input: {
       `Wymagane poparcie: ${input.idea.support_threshold}. Obecnie: ${input.idea.likes_count}.`,
     )
   }
+  if (input.selectedComments.length > MAX_SELECTED_COMMENTS) {
+    throw new Error(`Maks. ${MAX_SELECTED_COMMENTS} komentarzy we wniosku.`)
+  }
 
   const previous = await countGenerations(input.idea.id)
   if (previous >= MAX_GENERATIONS_PER_IDEA) {
     throw new Error(`Limit ${MAX_GENERATIONS_PER_IDEA} generowań na pomysł w demo.`)
   }
 
+  const { data: inflight } = await supabase
+    .from('applications')
+    .select('id')
+    .eq('idea_id', input.idea.id)
+    .eq('generation_status', 'generating')
+    .limit(1)
+  if (inflight && inflight.length > 0) {
+    throw new Error('Trwa już generowanie dla tego pomysłu — odczekaj.')
+  }
+
+  const fromEdge = await tryEdgeGenerate(input)
+  if (fromEdge) return fromEdge
+
   const content: ApplicationContent = mockGenerateApplication({
     idea: input.idea,
-    selectedComments: input.selectedComments,
+    selectedComments: input.selectedComments.slice(0, MAX_SELECTED_COMMENTS),
     costItems: input.costItems,
     landNote: input.landNote,
   })
