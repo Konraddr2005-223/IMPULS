@@ -1,0 +1,80 @@
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it, vi } from 'vitest'
+import { LandCard } from './LandCard'
+import type { LandAssessment } from '../city/types'
+import { copy } from '../ui/copy'
+
+const mockSyntheticAssessment: LandAssessment = {
+  mode: 'synthetic_demo',
+  parcelId: '223/4',
+  ownershipClass: 'municipal',
+  ownershipRawLabel: 'Władanie Gminy Kraków',
+  planning: {
+    planName: 'STARE MIASTO',
+    designation: 'ZP.1',
+    resolutionUrl: 'https://bip.krakow.pl/uchwala-demo',
+  },
+  assessment: 'likely_suitable',
+  warnings: ['Projekt wymaga zachowania ogólnodostępności.'],
+  retrievedAt: '2026-10-03T14:00:00Z',
+  ownershipUpdatedAt: '2026-02-05',
+  planningUpdatedAt: '2026-10-02',
+  scenarioDescription: 'Skwer ogólnodostępny w centrum.',
+}
+
+describe('LandCard', () => {
+  it('renders loading state', () => {
+    render(<LandCard assessment={null} loading={true} error={null} onClose={vi.fn()} />)
+    expect(screen.getByText(/Odpytuję dane MSIP Kraków/i)).toBeInTheDocument()
+  })
+
+  it('renders error message', () => {
+    render(
+      <LandCard
+        assessment={null}
+        loading={false}
+        error="Nie można połączyć się z serwerem WMS"
+        onClose={vi.fn()}
+      />,
+    )
+    expect(screen.getByText(/Nie można połączyć się z serwerem WMS/i)).toBeInTheDocument()
+  })
+
+  it('renders synthetic demo assessment details, planning info and BIP link', () => {
+    render(
+      <LandCard
+        assessment={mockSyntheticAssessment}
+        loading={false}
+        error={null}
+        onClose={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByText(/Scenariusz demonstracyjny/i)).toBeInTheDocument()
+    expect(screen.getByText('Władanie Gminy Kraków')).toBeInTheDocument()
+    expect(screen.getByText(/STARE MIASTO/i)).toBeInTheDocument()
+    expect(screen.getByText(/ZP.1/i)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Zobacz uchwałę planu w BIP/i })).toHaveAttribute(
+      'href',
+      'https://bip.krakow.pl/uchwala-demo',
+    )
+    expect(screen.getByText(copy.landDisclaimer)).toBeInTheDocument()
+  })
+
+  it('triggers onClose callback on button click', async () => {
+    const user = userEvent.setup()
+    const onClose = vi.fn()
+    render(
+      <LandCard
+        assessment={mockSyntheticAssessment}
+        loading={false}
+        error={null}
+        onClose={onClose}
+      />,
+    )
+
+    await user.click(screen.getByLabelText('Zamknij kartę terenu'))
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+})

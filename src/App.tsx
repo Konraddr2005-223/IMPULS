@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
+import { Layers } from 'lucide-react'
 import { ApplicationEditor } from './applications/ApplicationEditor'
 import {
   PrepareApplicationForm,
@@ -17,7 +18,7 @@ import type { CommentRecord } from './comments/api'
 import { DEMO_DISCLAIMER, demoFaults, demoIdeas } from './data/demoContent'
 import { CreateFaultForm } from './faults/CreateFaultForm'
 import { FaultDetailCard } from './faults/FaultDetailCard'
-import { FAULT_STATUS_LABELS, fetchFaults } from './faults/api'
+import { FAULT_CATEGORY_LABELS, FAULT_STATUS_LABELS, fetchFaults } from './faults/api'
 import type { FaultRecord } from './faults/types'
 import { CreateIdeaForm } from './ideas/CreateIdeaForm'
 import { IdeaDetailCard } from './ideas/IdeaDetailCard'
@@ -33,7 +34,7 @@ import type { IdeaRecord } from './ideas/types'
 import { useOnline } from './lib/online'
 import { isSupabaseConfigured } from './lib/supabase'
 import { LandCard } from './map/LandCard'
-import { MapCanvas, type MapCircle, type MapMarker } from './map/MapCanvas'
+import { MapCanvas, type MapCircle, type MapMarker, type WmsLayerId } from './map/MapCanvas'
 import { MyScreen } from './me/MyScreen'
 import { NotificationsScreen } from './notifications/NotificationsScreen'
 import { brand } from './theme/tokens'
@@ -44,7 +45,6 @@ type MapLayer = 'pomysly' | 'usterki'
 type MapMode = 'mapa' | 'lista'
 type AddKind = 'idea' | 'fault'
 type MojeView = 'home' | 'areas'
-
 const TABS: { id: TabId; label: string }[] = [
   { id: 'mapa', label: 'Mapa' },
   { id: 'dodaj', label: 'Dodaj' },
@@ -63,12 +63,11 @@ function App() {
   const [mode, setMode] = useState<MapMode>('mapa')
   const [filterByAreas, setFilterByAreas] = useState(false)
   const [ideaFilters, setIdeaFilters] = useState<IdeaListFilters>(emptyIdeaFilters)
+  const [wmsLayer, setWmsLayer] = useState<WmsLayerId>('none')
   const [land, setLand] = useState<LandAssessment | null>(null)
   const [landLoading, setLandLoading] = useState(false)
   const [landError, setLandError] = useState<string | null>(null)
-  const [draftPoint, setDraftPoint] = useState<{ lat: number; lng: number } | null>(
-    null,
-  )
+  const [draftPoint, setDraftPoint] = useState<{ lat: number; lng: number } | null>(null)
   const [selectedIdeaId, setSelectedIdeaId] = useState<string | null>(null)
   const [selectedFaultId, setSelectedFaultId] = useState<string | null>(null)
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set())
@@ -109,13 +108,27 @@ function App() {
     if (likesQuery.data) setLikedIds(likesQuery.data)
   }, [likesQuery.data])
 
+  // Ranking ideas: likes_count DESC, created_at DESC, id ASC (spec §4)
   const filteredIdeas = useMemo(() => {
     let list = filterIdeas(ideas, ideaFilters)
     if (filterByAreas && areas.length > 0) {
       list = list.filter((idea) => ideaMatchesAreas(idea, areas))
     }
-    return list
+    return [...list].sort((a, b) => {
+      if (b.likes_count !== a.likes_count) return b.likes_count - a.likes_count
+      const timeDiff = new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      if (timeDiff !== 0) return timeDiff
+      return a.id.localeCompare(b.id)
+    })
   }, [ideas, areas, filterByAreas, ideaFilters])
+
+  const filteredDemoIdeas = useMemo(() => {
+    let list = demoIdeas
+    if (ideaFilters.category) {
+      list = list.filter((i) => i.category === ideaFilters.category)
+    }
+    return [...list].sort((a, b) => b.likesCount - a.likesCount)
+  }, [ideaFilters.category])
 
   async function handleMapClick(point: { lat: number; lng: number }) {
     setSelectedIdeaId(null)
@@ -182,9 +195,15 @@ function App() {
   }
 
   const selectedIdea =
-    filteredIdeas.find((idea) => idea.id === selectedIdeaId) ?? null
-  const selectedFault =
-    faults.find((fault) => fault.id === selectedFaultId) ?? null
+    (ideasFromDb ? filteredIdeas : []).find((idea) => idea.id === selectedIdeaId) ?? null
+
+  const selectedFault = useMemo(() => {
+    if (!selectedFaultId) return null
+    if (faultsFromDb) {
+      return faults.find((f) => f.id === selectedFaultId) ?? null
+    }
+    return demoFaults.find((f) => f.id === selectedFaultId) ?? null
+  }, [selectedFaultId, faults, faultsFromDb])
 
   if (application) {
     return (
@@ -231,12 +250,15 @@ function App() {
             land={land}
             landLoading={landLoading}
             landError={landError}
+            draftPoint={draftPoint}
             ideas={ideasFromDb ? filteredIdeas : null}
+            demoIdeas={filteredDemoIdeas}
             faults={faultsFromDb ? faults : null}
             areas={areas}
             filterByAreas={filterByAreas}
             ideaFilters={ideaFilters}
             districtOptions={uniqueDistricts(ideas)}
+            wmsLayer={wmsLayer}
             ideasSource={ideasFromDb ? 'db' : 'demo'}
             faultsSource={faultsFromDb ? 'db' : 'demo'}
             selectedIdea={selectedIdea}
@@ -245,6 +267,7 @@ function App() {
             userId={user?.id ?? null}
             onFilterByAreasChange={setFilterByAreas}
             onIdeaFiltersChange={setIdeaFilters}
+            onWmsLayerChange={setWmsLayer}
             onLayerChange={(next) => {
               setLayer(next)
               setSelectedIdeaId(null)
@@ -297,6 +320,9 @@ function App() {
               if (!selectedIdea) return
               void handleGenerate(selectedIdea, prepareComments, items)
             }}
+            onCheckLandForPoint={(point) => {
+              void handleMapClick(point)
+            }}
             onThresholdSaved={() => void qc.invalidateQueries({ queryKey: ['ideas'] })}
           />
         )}
@@ -333,7 +359,7 @@ function App() {
           <div className="flex-1 min-h-0 flex flex-col">
             <button
               type="button"
-              className="self-start m-3 text-sm border-0 bg-transparent cursor-pointer"
+              className="self-start m-3 text-sm border-0 bg-transparent cursor-pointer font-medium"
               style={{ color: 'var(--color-action)' }}
               onClick={() => setMojeView('home')}
             >
@@ -414,20 +440,24 @@ type MapScreenProps = {
   land: LandAssessment | null
   landLoading: boolean
   landError: string | null
+  draftPoint: { lat: number; lng: number } | null
   ideas: IdeaRecord[] | null
+  demoIdeas: typeof demoIdeas
   faults: FaultRecord[] | null
   areas: { id: string; lat: number | null; lng: number | null; radius_m: number | null; kind: string }[]
   filterByAreas: boolean
   ideaFilters: IdeaListFilters
   districtOptions: string[]
+  wmsLayer: WmsLayerId
   ideasSource: 'db' | 'demo'
   faultsSource: 'db' | 'demo'
   selectedIdea: IdeaRecord | null
-  selectedFault: FaultRecord | null
+  selectedFault: FaultRecord | (typeof demoFaults)[0] | null
   likedIds: Set<string>
   userId: string | null
   onFilterByAreasChange: (v: boolean) => void
   onIdeaFiltersChange: (f: IdeaListFilters) => void
+  onWmsLayerChange: (layer: WmsLayerId) => void
   onLayerChange: (layer: MapLayer) => void
   onModeChange: (mode: MapMode) => void
   onAdd: () => void
@@ -440,6 +470,7 @@ type MapScreenProps = {
   onLikeToggle: (ideaId: string, liked: boolean) => Promise<void>
   onCloseLand: () => void
   onCheckLandForIdea: (idea: IdeaRecord) => void
+  onCheckLandForPoint: (point: { lat: number; lng: number }) => void
   onPrepareApplication: (comments: CommentRecord[]) => void
   prepareOpen: boolean
   generateBusy: boolean
@@ -455,12 +486,15 @@ function MapScreen({
   land,
   landLoading,
   landError,
+  draftPoint,
   ideas,
+  demoIdeas,
   faults,
   areas,
   filterByAreas,
   ideaFilters,
   districtOptions,
+  wmsLayer,
   ideasSource,
   faultsSource,
   selectedIdea,
@@ -469,6 +503,7 @@ function MapScreen({
   userId,
   onFilterByAreasChange,
   onIdeaFiltersChange,
+  onWmsLayerChange,
   onLayerChange,
   onModeChange,
   onAdd,
@@ -481,6 +516,7 @@ function MapScreen({
   onLikeToggle,
   onCloseLand,
   onCheckLandForIdea,
+  onCheckLandForPoint,
   onPrepareApplication,
   prepareOpen,
   generateBusy,
@@ -490,9 +526,9 @@ function MapScreen({
   onThresholdSaved,
 }: MapScreenProps) {
   const topIdeaIds = useMemo(() => {
-    const list = ideas ?? []
+    const list = ideas ?? demoIdeas
     return new Set(list.slice(0, 3).map((i) => i.id))
-  }, [ideas])
+  }, [ideas, demoIdeas])
 
   const markers: MapMarker[] = useMemo(() => {
     if (layer === 'pomysly') {
@@ -503,6 +539,7 @@ function MapScreen({
           lng: idea.lng,
           kind: 'idea' as const,
           label: idea.title,
+          sublabel: `${idea.likes_count}/${idea.support_threshold} poparć`,
           highlight: topIdeaIds.has(idea.id),
         }))
       }
@@ -512,6 +549,8 @@ function MapScreen({
         lng: idea.lng,
         kind: 'idea' as const,
         label: idea.title,
+        sublabel: `${idea.likesCount}/${idea.supportThreshold} poparć`,
+        highlight: topIdeaIds.has(idea.id),
       }))
     }
     if (faults) {
@@ -521,6 +560,7 @@ function MapScreen({
         lng: fault.lng,
         kind: 'fault' as const,
         label: fault.description.slice(0, 40),
+        sublabel: FAULT_STATUS_LABELS[fault.status] ?? fault.status,
       }))
     }
     return demoFaults.map((fault) => ({
@@ -529,8 +569,9 @@ function MapScreen({
       lng: fault.lng,
       kind: 'fault' as const,
       label: fault.title,
+      sublabel: fault.status,
     }))
-  }, [layer, ideas, faults, topIdeaIds])
+  }, [layer, ideas, demoIdeas, faults, topIdeaIds])
 
   const circles: MapCircle[] = useMemo(
     () =>
@@ -575,13 +616,46 @@ function MapScreen({
           </LayerTab>
         </div>
 
-        <label className="inline-flex items-center gap-1 text-xs text-[var(--color-text)]/70">
+        {layer === 'pomysly' && (
+          <div className="hidden sm:inline-flex rounded-[var(--radius-card)] bg-[var(--color-bg)] p-1 text-xs">
+            <button
+              type="button"
+              onClick={() => onIdeaFiltersChange({ ...ideaFilters, category: '' })}
+              className={`px-2.5 py-1 rounded-md border-0 cursor-pointer font-medium ${
+                ideaFilters.category === '' ? 'bg-white shadow-sm text-[var(--color-text)]' : 'bg-transparent text-[var(--color-text)]/60'
+              }`}
+            >
+              Wszystkie
+            </button>
+            <button
+              type="button"
+              onClick={() => onIdeaFiltersChange({ ...ideaFilters, category: 'investment' })}
+              className={`px-2.5 py-1 rounded-md border-0 cursor-pointer font-medium ${
+                ideaFilters.category === 'investment' ? 'bg-white shadow-sm text-[var(--color-ideas)]' : 'bg-transparent text-[var(--color-text)]/60'
+              }`}
+            >
+              Inwestycyjne
+            </button>
+            <button
+              type="button"
+              onClick={() => onIdeaFiltersChange({ ...ideaFilters, category: 'non_investment' })}
+              className={`px-2.5 py-1 rounded-md border-0 cursor-pointer font-medium ${
+                ideaFilters.category === 'non_investment' ? 'bg-white shadow-sm text-[var(--color-ideas)]' : 'bg-transparent text-[var(--color-text)]/60'
+              }`}
+            >
+              Nieinwestycyjne
+            </button>
+          </div>
+        )}
+
+        <label className="inline-flex items-center gap-1.5 text-xs text-[var(--color-text)]/75 cursor-pointer">
           <input
             type="checkbox"
             checked={filterByAreas}
             onChange={(e) => onFilterByAreasChange(e.target.checked)}
+            className="rounded"
           />
-          Filtr: moje okolice
+          Moje okolice
         </label>
 
         {layer === 'pomysly' && (
@@ -639,6 +713,20 @@ function MapScreen({
           </div>
         )}
 
+        <div className="inline-flex items-center gap-1 text-xs text-[var(--color-text)]/70">
+          <Layers size={14} className="text-[var(--color-text)]/50" />
+          <select
+            value={wmsLayer}
+            onChange={(e) => onWmsLayerChange(e.target.value as WmsLayerId)}
+            className="min-h-8 px-2 py-0.5 rounded-md border border-black/10 bg-[var(--color-bg)] text-xs font-medium cursor-pointer"
+            aria-label="Warstwa WMS"
+          >
+            <option value="none">WMS: Brak (OSM)</option>
+            <option value="mpzp">WMS: MPZP Kraków</option>
+            <option value="ownership">WMS: Własność</option>
+          </select>
+        </div>
+
         <div
           className="inline-flex rounded-[var(--radius-card)] bg-[var(--color-bg)] p-1 ml-auto"
           role="group"
@@ -655,37 +743,52 @@ function MapScreen({
         <button
           type="button"
           onClick={onAdd}
-          className="hidden md:inline-flex items-center justify-center min-h-11 px-4 rounded-[var(--radius-card)] border-0 text-white text-sm font-medium cursor-pointer"
+          className="hidden md:inline-flex items-center justify-center min-h-11 px-4 rounded-[var(--radius-card)] border-0 text-white text-sm font-medium cursor-pointer shadow-sm hover:opacity-95"
           style={{ background: 'var(--color-action)' }}
         >
           Dodaj
         </button>
       </div>
 
-      <p className="m-0 px-3 py-1.5 text-xs text-[var(--color-text)]/60 bg-[var(--color-bg)] border-b border-black/5">
-        {DEMO_DISCLAIMER}
-        {` · Pomysły: ${ideasSource} · Usterki: ${faultsSource}`}
+      <p className="m-0 px-3 py-1.5 text-[11px] text-[var(--color-text)]/65 bg-[var(--color-bg)] border-b border-black/5 flex items-center justify-between">
+        <span>
+          {DEMO_DISCLAIMER}
+          {` · Pomysły: ${ideasSource} · Usterki: ${faultsSource}`}
+        </span>
+        {wmsLayer !== 'none' && (
+          <span className="font-semibold text-blue-700">
+            Aktywna warstwa WMS: {wmsLayer === 'mpzp' ? 'MPZP (Plany)' : 'Struktura Własności'}
+          </span>
+        )}
       </p>
 
-      <div className="flex-1 min-h-0 grid md:grid-cols-[minmax(260px,340px)_1fr]">
+      <div className="flex-1 min-h-0 grid md:grid-cols-[minmax(280px,360px)_1fr]">
         <aside
           className={`${mode === 'lista' ? 'flex' : 'hidden'} md:flex flex-col min-h-0 border-r border-black/5 bg-white overflow-y-auto`}
           aria-label={layer === 'pomysly' ? 'Lista pomysłów' : 'Lista usterek'}
         >
           {layer === 'pomysly' ? (
-            <ul className="m-0 p-0 list-none">
+            <ul className="m-0 p-0 list-none divide-y divide-black/5">
               {ideas ? (
                 ideas.length === 0 ? (
-                  <li className="px-4 py-3 text-sm text-[var(--color-text)]/60">
-                    {copy.emptyIdeas}
+                  <li className="px-4 py-8 text-center text-sm text-[var(--color-text)]/60">
+                    <p className="m-0 font-medium">{copy.emptyIdeas}</p>
+                    <button
+                      type="button"
+                      onClick={onAdd}
+                      className="mt-3 px-3 py-1.5 rounded-lg border-0 text-white text-xs font-medium cursor-pointer"
+                      style={{ background: 'var(--color-ideas)' }}
+                    >
+                      Dodaj pomysł teraz
+                    </button>
                   </li>
                 ) : (
-                  ideas.map((idea) => (
-                    <li key={idea.id} className="border-b border-black/5">
+                  ideas.map((idea, index) => (
+                    <li key={idea.id}>
                       <button
                         type="button"
                         onClick={() => onSelectIdea(idea.id)}
-                        className="w-full text-left px-4 py-3 border-0 bg-transparent cursor-pointer"
+                        className="w-full text-left px-4 py-3 border-0 bg-transparent cursor-pointer hover:bg-black/5 transition-colors"
                         style={{
                           background:
                             selectedIdea?.id === idea.id
@@ -693,40 +796,66 @@ function MapScreen({
                               : 'transparent',
                         }}
                       >
-                        <p className="m-0 font-medium">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="text-[11px] font-bold text-[var(--color-ideas)] uppercase tracking-wider">
+                            {index < 3 ? `★ #${index + 1} TOP` : `#${index + 1}`}
+                          </span>
+                          <span className="text-[11px] text-[var(--color-text)]/50">
+                            {idea.district_code ?? 'Kraków'}
+                          </span>
+                        </div>
+                        <p className="m-0 mt-0.5 font-medium text-sm text-[var(--color-text)]">
                           {idea.title}
-                          {topIdeaIds.has(idea.id) ? ' · top' : ''}
                         </p>
-                        <p className="m-0 mt-1 text-sm text-[var(--color-text)]/65">
-                          {idea.district_code ?? 'Kraków'} · {idea.likes_count}/
-                          {idea.support_threshold} · 👍 {idea.likes_count}
-                        </p>
+                        <div className="mt-1.5 flex items-center justify-between text-xs text-[var(--color-text)]/65">
+                          <span>
+                            👍 <strong>{idea.likes_count}</strong> / {idea.support_threshold} poparć
+                          </span>
+                          <span className="text-[11px] font-medium text-emerald-700">
+                            {idea.likes_count >= idea.support_threshold ? '✓ Odblokowany BO' : 'w toku'}
+                          </span>
+                        </div>
                       </button>
                     </li>
                   ))
                 )
               ) : (
-                demoIdeas.map((idea) => (
-                  <li key={idea.id} className="border-b border-black/5 px-4 py-3">
-                    <p className="m-0 font-medium">{idea.title}</p>
+                demoIdeas.map((idea, index) => (
+                  <li key={idea.id} className="border-b border-black/5">
+                    <button
+                      type="button"
+                      onClick={() => onMapClick({ lat: idea.lat, lng: idea.lng })}
+                      className="w-full text-left px-4 py-3 border-0 bg-transparent cursor-pointer hover:bg-black/5 transition-colors"
+                    >
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="font-bold text-[var(--color-ideas)]">
+                          {index < 3 ? `★ #${index + 1} TOP` : `#${index + 1}`}
+                        </span>
+                        <span className="text-[var(--color-text)]/50">{idea.district}</span>
+                      </div>
+                      <p className="m-0 mt-0.5 font-medium text-sm">{idea.title}</p>
+                      <p className="m-0 mt-1 text-xs text-[var(--color-text)]/65">
+                        👍 {idea.likesCount} / {idea.supportThreshold} poparć
+                      </p>
+                    </button>
                   </li>
                 ))
               )}
             </ul>
           ) : (
-            <ul className="m-0 p-0 list-none">
+            <ul className="m-0 p-0 list-none divide-y divide-black/5">
               {faults ? (
                 faults.length === 0 ? (
-                  <li className="px-4 py-3 text-sm text-[var(--color-text)]/60">
-                    Brak usterek w tym widoku. Dodaj zgłoszenie z mapy.
+                  <li className="px-4 py-8 text-center text-sm text-[var(--color-text)]/60">
+                    Brak zgłoszonych usterek w tym widoku.
                   </li>
                 ) : (
                   faults.map((fault) => (
-                    <li key={fault.id} className="border-b border-black/5">
+                    <li key={fault.id}>
                       <button
                         type="button"
                         onClick={() => onSelectFault(fault.id)}
-                        className="w-full text-left px-4 py-3 border-0 bg-transparent cursor-pointer"
+                        className="w-full text-left px-4 py-3 border-0 bg-transparent cursor-pointer hover:bg-black/5 transition-colors"
                         style={{
                           background:
                             selectedFault?.id === fault.id
@@ -734,9 +863,16 @@ function MapScreen({
                               : 'transparent',
                         }}
                       >
-                        <p className="m-0 font-medium">{fault.description}</p>
-                        <p className="m-0 mt-1 text-sm text-[var(--color-text)]/65">
-                          ● {FAULT_STATUS_LABELS[fault.status] ?? fault.status}
+                        <div className="flex items-center justify-between gap-1 text-[11px] mb-1">
+                          <span className="font-semibold text-[var(--color-faults)]">
+                            {FAULT_CATEGORY_LABELS[fault.category] ?? fault.category}
+                          </span>
+                          <span className="text-[var(--color-text)]/60">
+                            {FAULT_STATUS_LABELS[fault.status] ?? fault.status}
+                          </span>
+                        </div>
+                        <p className="m-0 font-medium text-sm text-[var(--color-text)]">
+                          {fault.description}
                         </p>
                       </button>
                     </li>
@@ -744,12 +880,32 @@ function MapScreen({
                 )
               ) : (
                 demoFaults.map((fault) => (
-                  <li key={fault.id} className="border-b border-black/5 px-4 py-3">
-                    <p className="m-0 font-medium">{fault.title}</p>
+                  <li key={fault.id}>
+                    <button
+                      type="button"
+                      onClick={() => onSelectFault(fault.id)}
+                      className="w-full text-left px-4 py-3 border-0 bg-transparent cursor-pointer hover:bg-black/5 transition-colors"
+                      style={{
+                        background:
+                          selectedFault?.id === fault.id
+                            ? 'color-mix(in srgb, var(--color-faults) 8%, white)'
+                            : 'transparent',
+                      }}
+                    >
+                      <div className="flex items-center justify-between text-[11px] mb-1">
+                        <span className="font-semibold text-[var(--color-faults)]">
+                          {FAULT_CATEGORY_LABELS[fault.category] ?? fault.category}
+                        </span>
+                        <span className="text-[var(--color-text)]/60">{fault.status}</span>
+                      </div>
+                      <p className="m-0 font-medium text-sm">{fault.title}</p>
+                      <p className="m-0 text-xs text-[var(--color-text)]/65">{fault.description}</p>
+                    </button>
                   </li>
                 ))
               )}
             </ul>
+
           )}
         </aside>
 
@@ -761,13 +917,15 @@ function MapScreen({
             className="absolute inset-0 h-full w-full z-0"
             markers={markers}
             circles={circles}
+            draftPoint={draftPoint}
+            wmsLayer={wmsLayer}
             onMapClick={onMapClick}
             onMarkerClick={(marker) => {
-              if (marker.kind === 'idea' && ideas) {
+              if (marker.kind === 'idea') {
                 onSelectIdea(marker.id)
                 return
               }
-              if (marker.kind === 'fault' && faults) {
+              if (marker.kind === 'fault') {
                 onSelectFault(marker.id)
                 return
               }
@@ -790,14 +948,9 @@ function MapScreen({
                 </p>
               )}
             </>
-          ) : selectedFault && !land && !landLoading ? (
-            <FaultDetailCard
-              fault={selectedFault}
-              userId={userId}
-              onClose={onCloseFault}
-              onUpdated={() => onFaultUpdated()}
-            />
-          ) : selectedIdea && !land && !landLoading ? (
+          ) : null}
+
+          {selectedIdea && !land && !landLoading && !prepareOpen && (
             <IdeaDetailCard
               idea={selectedIdea}
               liked={likedIds.has(selectedIdea.id)}
@@ -810,7 +963,21 @@ function MapScreen({
               onPrepareApplication={onPrepareApplication}
               onThresholdSaved={onThresholdSaved}
             />
-          ) : (
+          )}
+
+          {selectedFault && !land && !landLoading && (
+            <FaultDetailCard
+              fault={selectedFault}
+              userId={userId}
+              onClose={onCloseFault}
+              onUpdated={() => onFaultUpdated()}
+              onCheckLand={() =>
+                onCheckLandForPoint({ lat: selectedFault.lat, lng: selectedFault.lng })
+              }
+            />
+          )}
+
+          {!selectedIdea && !selectedFault && (
             <LandCard
               assessment={land}
               loading={landLoading}
@@ -818,10 +985,11 @@ function MapScreen({
               onClose={onCloseLand}
             />
           )}
+
           <button
             type="button"
             onClick={onAdd}
-            className="md:hidden absolute bottom-4 right-4 z-10 min-h-12 min-w-12 px-4 rounded-full border-0 text-white text-sm font-medium shadow-md cursor-pointer"
+            className="md:hidden absolute bottom-4 right-4 z-10 min-h-12 min-w-12 px-4 rounded-full border-0 text-white text-sm font-medium shadow-lg cursor-pointer"
             style={{ background: 'var(--color-action)' }}
             aria-label="Dodaj wpis"
           >

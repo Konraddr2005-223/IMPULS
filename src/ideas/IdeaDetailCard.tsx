@@ -1,3 +1,4 @@
+import { Heart, MapPin, Send, Sparkles, ThumbsUp, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { addComment, fetchComments, type CommentRecord } from '../comments/api'
 import { publicPhotoUrl } from '../lib/storage'
@@ -48,6 +49,7 @@ export function IdeaDetailCard({
   }, [idea.id])
 
   const reached = idea.likes_count >= idea.support_threshold
+  const progressPercent = Math.min(100, Math.round((idea.likes_count / Math.max(1, idea.support_threshold)) * 100))
 
   async function toggleLike() {
     if (!canLike || busy) return
@@ -67,10 +69,11 @@ export function IdeaDetailCard({
       setError('Zaloguj się, aby komentować.')
       return
     }
+    if (!commentBody.trim()) return
     setBusy(true)
     setError(null)
     try {
-      const created = await addComment(idea.id, userId, commentBody)
+      const created = await addComment(idea.id, userId, commentBody.trim())
       setComments((prev) => [...prev, created])
       setCommentBody('')
     } catch (err) {
@@ -100,160 +103,242 @@ export function IdeaDetailCard({
     onPrepareApplication(chosen)
   }
 
+  const photoUrl = idea.photo_path ? publicPhotoUrl(idea.photo_path) : null
+
   return (
     <aside
-      className="absolute left-3 right-3 md:left-auto md:right-4 md:w-[400px] bottom-4 z-10 rounded-[var(--radius-card)] bg-white border border-black/10 shadow-lg p-4 max-h-[75svh] overflow-y-auto"
+      className="absolute left-3 right-3 md:left-auto md:right-4 md:w-[410px] bottom-4 z-10 rounded-[var(--radius-card)] bg-white border border-black/10 shadow-xl p-4 max-h-[85vh] overflow-y-auto flex flex-col gap-3"
       aria-label="Szczegóły pomysłu"
     >
-      <div className="flex items-start justify-between gap-3">
-        <h2 className="m-0 text-base font-semibold">{idea.title}</h2>
+      {/* Header */}
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span
+              className="px-2 py-0.5 text-xs font-semibold rounded-full text-white"
+              style={{ background: 'var(--color-ideas)' }}
+            >
+              {idea.category === 'investment' ? 'Inwestycyjny' : 'Nieinwestycyjny'}
+            </span>
+            <span className="text-xs text-[var(--color-text)]/60 font-medium">
+              {idea.district_code ?? 'Kraków'}
+            </span>
+          </div>
+          <h2 className="m-0 text-base font-semibold text-[var(--color-text)]">{idea.title}</h2>
+        </div>
         <button
           type="button"
           onClick={onClose}
-          className="border-0 bg-transparent cursor-pointer text-sm text-[var(--color-text)]/60"
+          className="p-1 rounded-full text-[var(--color-text)]/60 hover:text-[var(--color-text)] hover:bg-black/5 border-0 bg-transparent cursor-pointer"
           aria-label="Zamknij szczegóły pomysłu"
         >
-          Zamknij
+          <X size={18} />
         </button>
       </div>
 
-      <p className="mt-2 mb-0 text-sm text-[var(--color-text)]/80 whitespace-pre-wrap">
-        {idea.description}
-      </p>
-      {idea.photo_path && publicPhotoUrl(idea.photo_path) && (
-        <img
-          src={publicPhotoUrl(idea.photo_path)!}
-          alt=""
-          className="mt-3 w-full max-h-48 object-cover rounded-[var(--radius-card)]"
-        />
+      {photoUrl && (
+        <div className="rounded-lg overflow-hidden border border-black/5 max-h-48 bg-black/5">
+          <img
+            src={photoUrl}
+            alt={idea.title}
+            className="w-full h-full object-cover"
+            loading="lazy"
+          />
+        </div>
       )}
 
-      <p className="mt-3 mb-0 text-sm">
-        Poparcie: <strong>{idea.likes_count}/{idea.support_threshold}</strong>
-        {reached ? ' · próg osiągnięty' : ''}
+      {/* Description */}
+      <p className="m-0 text-sm text-[var(--color-text)]/85 whitespace-pre-wrap leading-relaxed">
+        {idea.description}
       </p>
-      <p className="mt-1 mb-0 text-xs text-[var(--color-text)]/60">
-        Próg ustalony przez autora: {idea.support_threshold} os. To sygnał zainteresowania, nie
-        wymóg urzędu.
-      </p>
-      <p className="mt-1 mb-0 text-xs text-[var(--color-text)]/60">{copy.likeDisclaimer}</p>
 
+      {/* Progress & Support Section */}
+      <div className="rounded-lg bg-[var(--color-bg)] p-3 border border-black/5 space-y-2">
+        <div className="flex items-baseline justify-between text-xs">
+          <span className="font-semibold text-[var(--color-text)] flex items-center gap-1">
+            <ThumbsUp size={13} className="text-[var(--color-ideas)]" />
+            Poparcie sąsiadów:
+          </span>
+          <span className="font-bold text-[var(--color-ideas)]">
+            {idea.likes_count} z {idea.support_threshold} głosów
+          </span>
+        </div>
+
+        {/* Progress Bar */}
+        <div className="w-full bg-black/10 rounded-full h-2 overflow-hidden">
+          <div
+            className="h-full rounded-full transition-all duration-300"
+            style={{
+              width: `${progressPercent}%`,
+              background: reached ? '#10B981' : 'var(--color-ideas)',
+            }}
+          />
+        </div>
+
+        <p className="m-0 text-[11px] text-[var(--color-text)]/65 leading-tight">
+          Próg ustalony przez autora: {idea.support_threshold} os. To sygnał zainteresowania, nie wymóg urzędu.
+        </p>
+
+        <p className="m-0 text-[11px] text-[var(--color-text)]/65 leading-tight italic">
+          {copy.likeDisclaimer}
+        </p>
+      </div>
+
+      {/* Author threshold settings */}
       {isAuthor && (
-        <div className="mt-3 flex items-end gap-2">
-          <label className="flex flex-col gap-1 text-sm flex-1">
-            <span className="font-medium">Próg autora</span>
+        <div className="rounded-lg bg-emerald-50/50 p-2.5 border border-emerald-100 flex items-center gap-2 text-xs">
+          <label className="flex-1 flex flex-col gap-0.5">
+            <span className="font-medium text-emerald-950">Twój próg poparcia (autor):</span>
             <input
               type="number"
               min={1}
               max={50}
               value={threshold}
               onChange={(e) => setThreshold(Number(e.target.value))}
-              className="min-h-10 px-3 rounded-[var(--radius-card)] border border-black/10"
+              className="min-h-8 px-2 rounded-md border border-black/15 bg-white text-xs font-semibold"
             />
           </label>
           <button
             type="button"
             onClick={saveThreshold}
-            disabled={busy}
-            className="min-h-10 px-3 rounded-[var(--radius-card)] border border-black/10 bg-[var(--color-bg)] text-sm cursor-pointer"
+            disabled={busy || threshold === idea.support_threshold}
+            className="min-h-8 self-end px-3 rounded-md border border-black/10 bg-white hover:bg-emerald-100 text-xs font-medium cursor-pointer disabled:opacity-40"
           >
-            Zapisz
+            Zmień próg
           </button>
         </div>
       )}
 
-      <div className="mt-3 flex flex-wrap gap-2">
+      {/* Primary Action Buttons */}
+      <div className="flex flex-wrap gap-2 pt-1">
         <button
           type="button"
           onClick={toggleLike}
           disabled={!canLike || busy}
           aria-pressed={liked}
-          className="min-h-11 px-4 rounded-[var(--radius-card)] border-0 text-white text-sm font-medium cursor-pointer disabled:opacity-50"
+          className="flex-1 min-h-11 px-4 rounded-[var(--radius-card)] border-0 text-white text-sm font-medium cursor-pointer disabled:opacity-50 inline-flex items-center justify-center gap-2 shadow-sm transition-all"
           style={{ background: liked ? 'var(--color-ideas)' : 'var(--color-action)' }}
         >
-          {busy ? '…' : liked ? 'Cofnij lajk' : 'Lubię to'}
+          {liked ? <Heart size={16} fill="white" /> : <ThumbsUp size={16} />}
+          {busy ? 'Zapisuję…' : liked ? 'Popierasz pomysł' : 'Popieram ten pomysł'}
         </button>
+
         <button
           type="button"
           onClick={onCheckLand}
-          className="min-h-11 px-4 rounded-[var(--radius-card)] border border-black/10 bg-[var(--color-bg)] text-sm font-medium cursor-pointer"
+          className="min-h-11 px-3.5 rounded-[var(--radius-card)] border border-black/10 bg-white hover:bg-[var(--color-bg)] text-xs font-medium cursor-pointer inline-flex items-center gap-1.5 transition-colors"
         >
-          Sprawdź teren
+          <MapPin size={14} className="text-[var(--color-action)]" />
+          Karta terenu
         </button>
       </div>
 
-      <h3 className="mt-4 mb-2 text-sm font-semibold">Komentarze</h3>
-      <ul className="m-0 p-0 list-none space-y-2">
-        {comments.map((comment) => (
-          <li key={comment.id} className="text-sm border-b border-black/5 pb-2">
-            {isAuthor && (
-              <label className="inline-flex items-start gap-2 mb-1">
-                <input
-                  type="checkbox"
-                  checked={selected.has(comment.id)}
-                  onChange={(e) => {
-                    setSelected((prev) => {
-                      const next = new Set(prev)
-                      if (e.target.checked) next.add(comment.id)
-                      else next.delete(comment.id)
-                      return next
-                    })
-                  }}
-                />
-                <span className="text-xs text-[var(--color-text)]/55">Uwzględnij we wniosku</span>
-              </label>
-            )}
-            <p className="m-0">{comment.body}</p>
-          </li>
-        ))}
-        {comments.length === 0 && (
-          <li className="text-sm text-[var(--color-text)]/55">Brak komentarzy.</li>
-        )}
-      </ul>
-
-      {userId && (
-        <div className="mt-2 flex flex-col gap-2">
-          <textarea
-            rows={2}
-            value={commentBody}
-            onChange={(e) => setCommentBody(e.target.value)}
-            placeholder="Dodaj komentarz…"
-            className="px-3 py-2 rounded-[var(--radius-card)] border border-black/10 text-sm resize-y"
-          />
+      {/* AI Application prepare CTA (opens cost/scope form, then generates) */}
+      {isAuthor && (
+        <div className="pt-1">
           <button
             type="button"
-            onClick={submitComment}
-            disabled={busy || !commentBody.trim()}
-            className="min-h-10 px-3 rounded-[var(--radius-card)] border border-black/10 bg-white text-sm cursor-pointer disabled:opacity-50"
+            onClick={openPrepare}
+            disabled={!reached}
+            className="w-full min-h-11 px-4 rounded-[var(--radius-card)] border-0 text-white text-sm font-medium cursor-pointer disabled:opacity-50 inline-flex items-center justify-center gap-2 shadow-md transition-all"
+            style={{ background: reached ? 'var(--color-ideas)' : '#6B7280' }}
           >
-            Wyślij komentarz
+            <Sparkles size={16} />
+            {reached
+              ? 'Przygotuj wniosek BO (zakres + AI)'
+              : `Wniosek odblokuje się przy ${idea.support_threshold} poparciach`}
           </button>
+          {!reached && (
+            <p className="mt-1 mb-0 text-[11px] text-center text-[var(--color-text)]/50">
+              Zbierz jeszcze {Math.max(0, idea.support_threshold - idea.likes_count)} poparć, aby odblokować generator wniosku BO.
+            </p>
+          )}
         </div>
       )}
 
-      {isAuthor && (
-        <button
-          type="button"
-          onClick={openPrepare}
-          disabled={!reached}
-          className="mt-4 w-full min-h-11 px-4 rounded-[var(--radius-card)] border-0 text-white text-sm font-medium cursor-pointer disabled:opacity-50"
-          style={{ background: 'var(--color-ideas)' }}
-        >
-          {reached
-            ? 'Przygotuj wniosek BO (zakres + AI)'
-            : `Wniosek po osiągnięciu progu (${idea.likes_count}/${idea.support_threshold})`}
-        </button>
-      )}
+      {/* Comments section */}
+      <div className="pt-2 border-t border-black/5">
+        <h3 className="m-0 mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-text)]/70 flex items-center justify-between">
+          <span>Komentarze sąsiadów ({comments.length})</span>
+          {isAuthor && comments.length > 0 && (
+            <span className="text-[10px] text-emerald-700 font-normal">
+              Zaznacz uwagi dla wniosku BO
+            </span>
+          )}
+        </h3>
 
-      {!canLike && (
-        <p className="mt-2 mb-0 text-xs text-[var(--color-text)]/60">
-          Zaloguj się (Autor / Sąsiad), aby lajkować i komentować.
-        </p>
-      )}
+        <ul className="m-0 p-0 list-none space-y-2 max-h-40 overflow-y-auto">
+          {comments.map((comment) => (
+            <li
+              key={comment.id}
+              className={`p-2 rounded-lg text-xs border ${
+                selected.has(comment.id)
+                  ? 'bg-emerald-50/70 border-emerald-200'
+                  : 'bg-[var(--color-bg)] border-black/5'
+              }`}
+            >
+              {isAuthor && (
+                <label className="inline-flex items-center gap-1.5 mb-1 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selected.has(comment.id)}
+                    onChange={(e) => {
+                      setSelected((prev) => {
+                        const next = new Set(prev)
+                        if (e.target.checked) next.add(comment.id)
+                        else next.delete(comment.id)
+                        return next
+                      })
+                    }}
+                  />
+                  <span className="text-[10px] font-semibold text-emerald-800">
+                    Uwzględnij we wniosku BO
+                  </span>
+                </label>
+              )}
+              <p className="m-0 text-[var(--color-text)]/90">{comment.body}</p>
+            </li>
+          ))}
+          {comments.length === 0 && (
+            <li className="py-2 text-xs text-[var(--color-text)]/50 italic text-center">
+              Brak komentarzy. Bądź pierwszą osobą, która doda opinię!
+            </li>
+          )}
+        </ul>
+
+        {userId ? (
+          <div className="mt-2 flex gap-1.5">
+            <input
+              value={commentBody}
+              onChange={(e) => setCommentBody(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void submitComment()
+              }}
+              placeholder="Napisz opinię lub sugestię do pomysłu…"
+              className="flex-1 min-h-9 px-3 rounded-lg border border-black/10 text-xs bg-white focus:outline-[var(--color-ideas)]"
+            />
+            <button
+              type="button"
+              onClick={submitComment}
+              disabled={busy || !commentBody.trim()}
+              className="min-h-9 px-3 rounded-lg border-0 text-white text-xs font-medium cursor-pointer disabled:opacity-40 inline-flex items-center gap-1"
+              style={{ background: 'var(--color-action)' }}
+              aria-label="Wyślij komentarz"
+            >
+              <Send size={12} />
+            </button>
+          </div>
+        ) : (
+          <p className="mt-2 mb-0 text-[11px] text-[var(--color-text)]/55">
+            Zaloguj się kontem demonstracyjnym, aby popierać i dodawać komentarze.
+          </p>
+        )}
+      </div>
+
       {error && (
-        <p className="mt-2 mb-0 text-sm" style={{ color: 'var(--color-faults)' }}>
+        <div className="p-2 rounded-lg bg-red-50 text-xs text-red-700 border border-red-200">
           {error}
-        </p>
+        </div>
       )}
     </aside>
   )
