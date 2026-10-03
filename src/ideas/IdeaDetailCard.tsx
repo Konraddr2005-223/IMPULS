@@ -1,5 +1,6 @@
 import { Heart, MapPin, Send, Sparkles, ThumbsUp, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useAuth } from '../auth/AuthContext'
 import { addComment, fetchComments, type CommentRecord } from '../comments/api'
 import { publicPhotoUrl } from '../lib/storage'
 import { copy } from '../ui/copy'
@@ -22,7 +23,7 @@ type IdeaDetailCardProps = {
 export function IdeaDetailCard({
   idea,
   liked,
-  canLike,
+  canLike: _canLike,
   isAuthor,
   userId,
   onLikeToggle,
@@ -31,6 +32,7 @@ export function IdeaDetailCard({
   onPrepareApplication,
   onThresholdSaved,
 }: IdeaDetailCardProps) {
+  const { openAuthModal } = useAuth()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [comments, setComments] = useState<CommentRecord[]>([])
@@ -52,7 +54,11 @@ export function IdeaDetailCard({
   const progressPercent = Math.min(100, Math.round((idea.likes_count / Math.max(1, idea.support_threshold)) * 100))
 
   async function toggleLike() {
-    if (!canLike || busy) return
+    if (!userId) {
+      openAuthModal('login')
+      return
+    }
+    if (busy) return
     setBusy(true)
     setError(null)
     try {
@@ -214,7 +220,7 @@ export function IdeaDetailCard({
         <button
           type="button"
           onClick={toggleLike}
-          disabled={!canLike || busy}
+          disabled={busy}
           aria-pressed={liked}
           className="flex-1 min-h-11 px-4 rounded-[var(--radius-card)] border-0 text-white text-sm font-medium cursor-pointer disabled:opacity-50 inline-flex items-center justify-center gap-2 shadow-sm transition-all"
           style={{ background: liked ? 'var(--color-ideas)' : 'var(--color-action)' }}
@@ -329,9 +335,17 @@ export function IdeaDetailCard({
             </button>
           </div>
         ) : (
-          <p className="mt-2 mb-0 text-[11px] text-[var(--color-text)]/55">
-            Zaloguj się kontem demonstracyjnym, aby popierać i dodawać komentarze.
-          </p>
+          <div className="mt-2.5 p-2.5 rounded-lg bg-[var(--color-bg)] border border-black/5 flex items-center justify-between text-xs">
+            <span className="text-[var(--color-text)]/70">Zaloguj się, aby komentować i popierać</span>
+            <button
+              type="button"
+              onClick={() => openAuthModal('login')}
+              className="px-2.5 py-1 rounded-md text-white border-0 text-xs font-semibold cursor-pointer shadow-xs"
+              style={{ background: 'var(--color-action)' }}
+            >
+              Zaloguj się
+            </button>
+          </div>
         )}
       </div>
 

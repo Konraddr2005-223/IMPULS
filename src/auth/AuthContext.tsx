@@ -8,6 +8,7 @@ import {
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { DEMO_PASSWORD, demoAccounts, type DemoAccountKey } from './demoAccounts'
+import { AuthModal } from './AuthModal'
 
 type AuthState = {
   user: User | null
@@ -15,6 +16,16 @@ type AuthState = {
   displayName: string | null
   loading: boolean
   error: string | null
+  authModalOpen: boolean
+  authModalMode: 'login' | 'register'
+  openAuthModal: (mode?: 'login' | 'register') => void
+  closeAuthModal: () => void
+  signInWithEmail: (email: string, password: string) => Promise<void>
+  signUpWithEmail: (
+    email: string,
+    password: string,
+    displayName: string,
+  ) => Promise<{ requiresEmailConfirmation: boolean }>
   signInDemo: (key: DemoAccountKey) => Promise<void>
   signOut: () => Promise<void>
   clearError: () => void
@@ -31,7 +42,10 @@ async function ensureProfile(user: User, displayName: string) {
     },
     { onConflict: 'id' },
   )
-  if (error) throw error
+  if (error) {
+    // Non-fatal profile upsert error logging
+    console.warn('Profile sync notice:', error.message)
+  }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -40,6 +54,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [displayName, setDisplayName] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [authModalOpen, setAuthModalOpen] = useState(false)
+  const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login')
 
   useEffect(() => {
     if (!supabase) {
@@ -79,9 +95,99 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .eq('id', user.id)
       .maybeSingle()
       .then(({ data }) => {
-        setDisplayName(data?.display_name ?? user.email ?? null)
+        setDisplayName(
+          data?.display_name ??
+            (user.user_metadata?.display_name as string | undefined) ??
+            user.email ??
+            null,
+        )
       })
   }, [user])
+
+  function openAuthModal(mode: 'login' | 'register' = 'login') {
+    setError(null)
+    setAuthModalMode(mode)
+    setAuthModalOpen(true)
+  }
+
+  function closeAuthModal() {
+    setAuthModalOpen(false)
+  }
+
+  async function signInWithEmail(email: string, password: string) {
+    if (!supabase) {
+      setError('Supabase nie jest skonfigurowany.')
+      throw new Error('Supabase nie jest skonfigurowany.')
+    }
+
+    setError(null)
+    setLoading(true)
+
+    try {
+      const { data, error: signInErr } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      })
+
+      if (signInErr) throw signInErr
+
+      if (data.user) {
+        const fallbackName =
+          (data.user.user_metadata?.display_name as string | undefined) ??
+          email.trim().split('@')[0]
+        await ensureProfile(data.user, fallbackName)
+      }
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Błędny login lub hasło.'
+      setError(message)
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function signUpWithEmail(
+    email: string,
+    password: string,
+    rawDisplayName: string,
+  ) {
+    if (!supabase) {
+      setError('Supabase nie jest skonfigurowany.')
+      throw new Error('Supabase nie jest skonfigurowany.')
+    }
+
+    setError(null)
+    setLoading(true)
+
+    const finalDisplayName = rawDisplayName.trim() || email.trim().split('@')[0]
+
+    try {
+      const { data, error: signUpErr } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          data: { display_name: finalDisplayName },
+        },
+      })
+
+      if (signUpErr) throw signUpErr
+
+      if (data.user) {
+        await ensureProfile(data.user, finalDisplayName)
+      }
+
+      const requiresEmailConfirmation = !data.session
+      return { requiresEmailConfirmation }
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Rejestracja nie powiodła się.'
+      setError(message)
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }
 
   async function signInDemo(key: DemoAccountKey) {
     if (!supabase) {
@@ -148,12 +254,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         displayName,
         loading,
         error,
+        authModalOpen,
+        authModalMode,
+        openAuthModal,
+        closeAuthModal,
+        signInWithEmail,
+        signUpWithEmail,
         signInDemo,
         signOut,
         clearError: () => setError(null),
       }}
     >
       {children}
+      <AuthModal
+        isOpen={authModalOpen}
+        initialMode={authModalMode}
+        onClose={closeAuthModal}
+      />
     </AuthContext.Provider>
   )
 }

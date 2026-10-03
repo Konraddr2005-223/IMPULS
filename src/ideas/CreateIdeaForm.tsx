@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Camera, Check, LocateFixed, Trash2 } from 'lucide-react'
+import { Camera, Check, LocateFixed, LogIn, Trash2, UserPlus } from 'lucide-react'
 import { useEffect, useState, type ReactNode } from 'react'
 import { useForm } from 'react-hook-form'
 import { KRAKOW_DISTRICTS } from '../areas/api'
@@ -29,8 +29,14 @@ export function CreateIdeaForm({
   onCreated,
   onSwitchToFault,
 }: CreateIdeaFormProps) {
-  const { user, loading: authLoading, error: authError, signInDemo, clearError } =
-    useAuth()
+  const {
+    user,
+    loading: authLoading,
+    error: authError,
+    signInDemo,
+    clearError,
+    openAuthModal,
+  } = useAuth()
   const online = useOnline()
   const [photo, setPhoto] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
@@ -166,25 +172,45 @@ export function CreateIdeaForm({
         )}
 
         {!user && (
-          <div className="mb-4 p-3 rounded-[var(--radius-card)] bg-[var(--color-bg)] border border-black/5">
-            <p className="m-0 mb-2 text-xs text-[var(--color-text)]/80 font-medium">
-              Wybierz konto prezentacyjne, aby kontynuować:
+          <div className="mb-4 p-4 rounded-[var(--radius-card)] bg-[var(--color-bg)] border border-black/5">
+            <p className="m-0 mb-1 text-xs font-semibold text-[var(--color-text)]">
+              Wymagane logowanie do publikacji pomysłu
             </p>
-            <div className="flex flex-wrap gap-2">
+            <p className="m-0 mb-3 text-xs text-[var(--color-text)]/70">
+              Przeglądanie mapy nie wymaga konta. Zaloguj się lub załóż konto, aby publikować pomysły.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => openAuthModal('login')}
+                className="min-h-10 px-3.5 rounded-lg border-0 text-white text-xs font-semibold cursor-pointer shadow-sm hover:opacity-90 inline-flex items-center gap-1.5"
+                style={{ background: 'var(--color-ideas)' }}
+              >
+                <LogIn size={14} />
+                Zaloguj się
+              </button>
+              <button
+                type="button"
+                onClick={() => openAuthModal('register')}
+                className="min-h-10 px-3.5 rounded-lg border border-black/15 bg-white hover:bg-black/5 text-xs font-medium cursor-pointer text-[var(--color-text)] inline-flex items-center gap-1.5"
+              >
+                <UserPlus size={14} />
+                Zarejestruj się
+              </button>
+              <span className="text-xs text-[var(--color-text)]/40 px-0.5">lub demo:</span>
               {demoAccounts.map((account) => (
                 <button
                   key={account.key}
                   type="button"
                   disabled={authLoading}
                   onClick={() => signInDemo(account.key)}
-                  className="min-h-10 px-3 rounded-lg border-0 text-white text-xs font-medium cursor-pointer shadow-sm"
-                  style={{ background: 'var(--color-action)' }}
+                  className="min-h-9 px-2.5 rounded-lg border border-black/10 bg-white hover:bg-black/5 text-xs font-medium cursor-pointer text-[var(--color-text)]/80"
                 >
                   {account.label}
                 </button>
               ))}
             </div>
-            <p className="m-0 mt-2 text-[11px] text-[var(--color-text)]/60">{copy.authNote}</p>
+            <p className="m-0 mt-2.5 text-[10px] text-[var(--color-text)]/55">{copy.authNote}</p>
             {authError && (
               <p className="mt-2 mb-0 text-xs text-red-600 font-medium">{authError}</p>
             )}

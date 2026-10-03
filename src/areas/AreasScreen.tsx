@@ -17,7 +17,7 @@ type AreasScreenProps = {
 }
 
 export function AreasScreen({ draftPoint }: AreasScreenProps) {
-  const { user } = useAuth()
+  const { user, openAuthModal } = useAuth()
   const qc = useQueryClient()
   const [district, setDistrict] = useState<string>(KRAKOW_DISTRICTS[4])
   const [radiusName, setRadiusName] = useState('Moja okolica')
@@ -35,9 +35,28 @@ export function AreasScreen({ draftPoint }: AreasScreenProps) {
   if (!user) {
     return (
       <div className="flex-1 mx-auto w-full max-w-xl px-4 py-8">
-        <section className="rounded-[var(--radius-card)] bg-white p-6 border border-black/5">
+        <section className="rounded-[var(--radius-card)] bg-white p-6 border border-black/5 shadow-xs">
           <h2 className="m-0 text-lg font-semibold">Moje okolice</h2>
-          <p className="mt-2 mb-0 text-sm">Zaloguj się, aby zapisać dzielnice i promienie.</p>
+          <p className="mt-2 mb-4 text-sm text-[var(--color-text)]/70">
+            Zaloguj się, aby zapisać swoje ulubione dzielnice i promienie zainteresowania na mapie.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => openAuthModal('login')}
+              className="min-h-10 px-4 rounded-xl border-0 text-white text-xs font-semibold cursor-pointer shadow-sm hover:opacity-90 inline-flex items-center gap-1.5"
+              style={{ background: 'var(--color-action)' }}
+            >
+              Zaloguj się
+            </button>
+            <button
+              type="button"
+              onClick={() => openAuthModal('register')}
+              className="min-h-10 px-4 rounded-xl border border-black/15 bg-white hover:bg-black/5 text-xs font-semibold cursor-pointer text-[var(--color-text)] inline-flex items-center gap-1.5"
+            >
+              Zarejestruj się
+            </button>
+          </div>
         </section>
       </div>
     )

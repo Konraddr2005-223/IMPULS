@@ -14,7 +14,7 @@ type MyScreenProps = {
 }
 
 export function MyScreen({ onOpenAreas, onOpenApplication }: MyScreenProps) {
-  const { user, displayName } = useAuth()
+  const { user, displayName, openAuthModal } = useAuth()
 
   const ideasQuery = useQuery({
     queryKey: ['ideas'],
@@ -30,10 +30,30 @@ export function MyScreen({ onOpenAreas, onOpenApplication }: MyScreenProps) {
   if (!user) {
     return (
       <div className="flex-1 mx-auto w-full max-w-xl px-4 py-8">
-        <section className="rounded-[var(--radius-card)] bg-white p-6 border border-black/5">
-          <h2 className="m-0 text-lg font-semibold">Moje</h2>
-          <p className="mt-2 mb-0 text-sm">
-            Zaloguj się kontem prezentacyjnym. {copy.authNote}
+        <section className="rounded-[var(--radius-card)] bg-white p-6 border border-black/5 shadow-xs">
+          <h2 className="m-0 text-lg font-semibold">Moje zgłoszenia i projekty</h2>
+          <p className="mt-2 mb-4 text-sm text-[var(--color-text)]/70">
+            Przeglądanie aplikacji nie wymaga konta. Zaloguj się lub utwórz konto, aby zarządzać swoimi pomysłami, wnioskami BO i usterkami.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => openAuthModal('login')}
+              className="min-h-10 px-4 rounded-xl border-0 text-white text-xs font-semibold cursor-pointer shadow-sm hover:opacity-90 inline-flex items-center gap-1.5"
+              style={{ background: 'var(--color-action)' }}
+            >
+              Zaloguj się
+            </button>
+            <button
+              type="button"
+              onClick={() => openAuthModal('register')}
+              className="min-h-10 px-4 rounded-xl border border-black/15 bg-white hover:bg-black/5 text-xs font-semibold cursor-pointer text-[var(--color-text)] inline-flex items-center gap-1.5"
+            >
+              Zarejestruj się
+            </button>
+          </div>
+          <p className="mt-4 mb-0 text-[11px] text-[var(--color-text)]/55">
+            {copy.authNote}
           </p>
         </section>
       </div>
