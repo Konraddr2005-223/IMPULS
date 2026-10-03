@@ -76,6 +76,9 @@ export function DistrictsLayer({ highlightedDistricts = [] }: DistrictsLayerProp
   )
 }
 
+/** Brand green — municipal areas are always tinted green on the map. */
+const DISTRICT_GREEN = '#176B4B'
+
 function styleForFeature(
   properties: DistrictProperties | null | undefined,
   highlighted: Set<string>,
@@ -83,21 +86,22 @@ function styleForFeature(
   const canonical = canonicalDistrictName(properties?.name)
   const isHighlighted = canonical ? highlighted.has(highlightKey(canonical)) : false
 
+  // Interest areas: stronger green fill; other districts: lighter green outline/fill.
   if (isHighlighted) {
     return {
-      color: '#2457D6',
+      color: DISTRICT_GREEN,
       weight: 2.5,
-      fillColor: '#2457D6',
-      fillOpacity: 0.22,
-      opacity: 0.9,
+      fillColor: DISTRICT_GREEN,
+      fillOpacity: 0.32,
+      opacity: 0.95,
     }
   }
 
   return {
-    color: '#176B4B',
-    weight: 1,
-    fillColor: '#176B4B',
-    fillOpacity: 0.07,
-    opacity: 0.75,
+    color: DISTRICT_GREEN,
+    weight: 1.5,
+    fillColor: DISTRICT_GREEN,
+    fillOpacity: 0.16,
+    opacity: 0.85,
   }
 }

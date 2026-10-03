@@ -105,6 +105,15 @@ describe('App shell', () => {
     expect(screen.getByRole('tab', { name: 'Usterki' })).toBeInTheDocument()
   })
 
+  it('defaults municipal land overlay on and districts off', async () => {
+    renderApp()
+    const municipal = screen.getByRole('checkbox', { name: /Grunty gminne/i })
+    const districts = screen.getByRole('checkbox', { name: /Dzielnice/i })
+    expect(municipal).toBeChecked()
+    expect(districts).not.toBeChecked()
+    expect(screen.getByText(/Grunty Gminy Kraków \(GK\)/i)).toBeInTheDocument()
+  })
+
   it('shows land card after map click', async () => {
     const user = userEvent.setup()
     renderApp()

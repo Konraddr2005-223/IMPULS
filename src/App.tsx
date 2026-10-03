@@ -64,7 +64,8 @@ function App() {
   const [filterByAreas, setFilterByAreas] = useState(false)
   const [ideaFilters, setIdeaFilters] = useState<IdeaListFilters>(emptyIdeaFilters)
   const [wmsLayer, setWmsLayer] = useState<WmsLayerId>('none')
-  const [showDistricts, setShowDistricts] = useState(true)
+  const [showDistricts, setShowDistricts] = useState(false)
+  const [showMunicipalLand, setShowMunicipalLand] = useState(true)
   const [land, setLand] = useState<LandAssessment | null>(null)
   const [landLoading, setLandLoading] = useState(false)
   const [landError, setLandError] = useState<string | null>(null)
@@ -261,6 +262,7 @@ function App() {
             districtOptions={uniqueDistricts(ideas)}
             wmsLayer={wmsLayer}
             showDistricts={showDistricts}
+            showMunicipalLand={showMunicipalLand}
             ideasSource={ideasFromDb ? 'db' : 'demo'}
             faultsSource={faultsFromDb ? 'db' : 'demo'}
             selectedIdea={selectedIdea}
@@ -271,6 +273,7 @@ function App() {
             onIdeaFiltersChange={setIdeaFilters}
             onWmsLayerChange={setWmsLayer}
             onShowDistrictsChange={setShowDistricts}
+            onShowMunicipalLandChange={setShowMunicipalLand}
             onLayerChange={(next) => {
               setLayer(next)
               setSelectedIdeaId(null)
@@ -460,6 +463,7 @@ type MapScreenProps = {
   districtOptions: string[]
   wmsLayer: WmsLayerId
   showDistricts: boolean
+  showMunicipalLand: boolean
   ideasSource: 'db' | 'demo'
   faultsSource: 'db' | 'demo'
   selectedIdea: IdeaRecord | null
@@ -470,6 +474,7 @@ type MapScreenProps = {
   onIdeaFiltersChange: (f: IdeaListFilters) => void
   onWmsLayerChange: (layer: WmsLayerId) => void
   onShowDistrictsChange: (v: boolean) => void
+  onShowMunicipalLandChange: (v: boolean) => void
   onLayerChange: (layer: MapLayer) => void
   onModeChange: (mode: MapMode) => void
   onAdd: () => void
@@ -508,6 +513,7 @@ function MapScreen({
   districtOptions,
   wmsLayer,
   showDistricts,
+  showMunicipalLand,
   ideasSource,
   faultsSource,
   selectedIdea,
@@ -518,6 +524,7 @@ function MapScreen({
   onIdeaFiltersChange,
   onWmsLayerChange,
   onShowDistrictsChange,
+  onShowMunicipalLandChange,
   onLayerChange,
   onModeChange,
   onAdd,
@@ -683,6 +690,16 @@ function MapScreen({
         <label className="inline-flex items-center gap-1.5 text-xs text-[var(--color-text)]/75 cursor-pointer">
           <input
             type="checkbox"
+            checked={showMunicipalLand}
+            onChange={(e) => onShowMunicipalLandChange(e.target.checked)}
+            className="rounded"
+          />
+          Grunty gminne
+        </label>
+
+        <label className="inline-flex items-center gap-1.5 text-xs text-[var(--color-text)]/75 cursor-pointer">
+          <input
+            type="checkbox"
             checked={showDistricts}
             onChange={(e) => onShowDistrictsChange(e.target.checked)}
             className="rounded"
@@ -788,6 +805,11 @@ function MapScreen({
           {` · Pomysły: ${ideasSource} · Usterki: ${faultsSource}`}
         </span>
         <span className="inline-flex items-center gap-2">
+          {showMunicipalLand && (
+            <span className="font-medium text-[#142D6E]">
+              Grunty Gminy Kraków (GK)
+            </span>
+          )}
           {showDistricts && (
             <span className="font-medium text-emerald-800">
               Obrys dzielnic (poglądowy)
@@ -959,6 +981,7 @@ function MapScreen({
             draftPoint={draftPoint}
             wmsLayer={wmsLayer}
             showDistricts={showDistricts}
+            showMunicipalLand={showMunicipalLand}
             highlightedDistricts={highlightedDistricts}
             onMapClick={onMapClick}
             onMarkerClick={(marker) => {
