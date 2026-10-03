@@ -181,12 +181,19 @@ describe('App shell', () => {
     const user = userEvent.setup()
     renderApp()
     expect(await screen.findByText(/Pomysły: db/i)).toBeInTheDocument()
-    const ideaButton = screen.getByRole('button', { name: /Zielony zakątek z ławkami/i })
-    await user.click(ideaButton)
-    await waitFor(() => {
-      expect(screen.getByTestId('map-center-point').textContent).toMatch(/^50\.07/)
-    })
-  })
+    const cards = screen.getAllByTestId('idea-list-card')
+    const ideaButton = cards.find((el) =>
+      /Zielony zakątek z ławkami/i.test(el.textContent ?? ''),
+    )
+    expect(ideaButton).toBeTruthy()
+    await user.click(ideaButton!)
+    await waitFor(
+      () => {
+        expect(screen.getByTestId('map-center-point').textContent).toMatch(/^50\.07/)
+      },
+      { timeout: 3000 },
+    )
+  }, 10_000)
 
   it('allows hiding and showing the top ideas list via the hide button', async () => {
     const user = userEvent.setup()

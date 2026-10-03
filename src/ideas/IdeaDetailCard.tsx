@@ -5,6 +5,8 @@ import { addComment, fetchComments, type CommentRecord } from '../comments/api'
 import { publicPhotoUrl } from '../lib/storage'
 import { copy } from '../ui/copy'
 import { updateSupportThreshold } from './api'
+import { IdeaPhoto } from './IdeaPhoto'
+import { ideaVisualMeta } from './ideaVisuals'
 import type { IdeaRecord } from './types'
 
 type IdeaDetailCardProps = {
@@ -121,27 +123,33 @@ export function IdeaDetailCard({
   }
 
   const photoUrl = idea.photo_path ? publicPhotoUrl(idea.photo_path) : null
+  const visual = ideaVisualMeta(idea.title, idea.description)
 
   return (
     <aside
-      className="absolute left-3 right-3 md:left-auto md:right-4 md:w-[410px] bottom-4 z-10 rounded-[var(--radius-card)] bg-white border border-black/10 shadow-xl p-4 max-h-[85vh] overflow-y-auto flex flex-col gap-3"
+      className="absolute left-3 right-3 md:left-auto md:right-4 md:w-[410px] bottom-4 z-10 rounded-[var(--radius-card)] bg-white border border-[var(--color-outline)] shadow-[var(--shadow-card)] p-4 max-h-[85vh] overflow-y-auto flex flex-col gap-3 ring-1 ring-black/5"
       aria-label="Szczegóły pomysłu"
     >
+      <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[var(--radius-card)] bg-[var(--color-primary)]" />
       {/* Header */}
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex items-start justify-between gap-2 pt-1">
         <div>
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex flex-wrap items-center gap-2 mb-1">
             <span
-              className="px-2 py-0.5 text-xs font-semibold rounded-full text-white"
-              style={{ background: 'var(--color-ideas)' }}
+              className={`px-2.5 py-0.5 text-[11px] font-bold rounded-full ${visual.badgeClass}`}
             >
+              {visual.label}
+            </span>
+            <span className="px-2 py-0.5 text-[11px] font-semibold rounded-full bg-slate-100 text-slate-700">
               {idea.category === 'investment' ? 'Inwestycyjny' : 'Nieinwestycyjny'}
             </span>
-            <span className="text-xs text-[var(--color-text)]/60 font-medium">
+            <span className="text-xs text-[var(--color-text-muted)] font-medium">
               {idea.district_code ?? 'Kraków'}
             </span>
           </div>
-          <h2 className="m-0 text-base font-semibold text-[var(--color-text)]">{idea.title}</h2>
+          <h2 className="m-0 text-base font-bold tracking-tight text-[var(--color-text)]">
+            {idea.title}
+          </h2>
         </div>
         <button
           type="button"
@@ -153,16 +161,13 @@ export function IdeaDetailCard({
         </button>
       </div>
 
-      {photoUrl && (
-        <div className="rounded-lg overflow-hidden border border-black/5 max-h-48 bg-black/5">
-          <img
-            src={photoUrl}
-            alt={idea.title}
-            className="w-full h-full object-cover"
-            loading="lazy"
-          />
-        </div>
-      )}
+      <IdeaPhoto
+        title={idea.title}
+        description={idea.description}
+        photoPath={idea.photo_path}
+        publicUrl={photoUrl}
+        className="rounded-xl border border-[var(--color-outline)] max-h-48 aspect-[16/10]"
+      />
 
       {/* Description */}
       <p className="m-0 text-sm text-[var(--color-text)]/85 whitespace-pre-wrap leading-relaxed">

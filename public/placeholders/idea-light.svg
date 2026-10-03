@@ -1,0 +1,17 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400" role="img" aria-label="Placeholder">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fef9c3"/>
+      <stop offset="55%" stop-color="#e0f2fe"/>
+      <stop offset="100%" stop-color="#d1fae5"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="400" fill="url(#g)"/>
+  <rect x="24" y="24" width="592" height="352" rx="24" fill="#ffffff" fill-opacity="0.55" stroke="#0f172a" stroke-opacity="0.08"/>
+  <circle cx="320" cy="168" r="56" fill="#facc15" stroke="#0f172a" stroke-width="4"/>
+  <g transform="translate(296 144)" stroke="#0f172a" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 44v-14"/><path d="M4 22c0-6 4-12 8-12s8 6 8 12-4 10-8 10-8-4-8-10"/><path d="M0 34c0-4 3-8 8-8"/><path d="M24 34c0-4-3-8-8-8"/>
+  </g>
+  <text x="320" y="280" text-anchor="middle" font-family="Public Sans, system-ui, sans-serif" font-size="22" font-weight="700" fill="#0f172a">Pomysł sąsiedzki</text>
+  <text x="320" y="312" text-anchor="middle" font-family="Public Sans, system-ui, sans-serif" font-size="14" fill="#565e74">Brak zdjęcia — podgląd kategorii (light)</text>
+</svg>

@@ -1,7 +1,10 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
-import { PanelLeftClose, PanelLeftOpen, ThumbsUp } from 'lucide-react'
+import { PanelLeftClose, PanelLeftOpen, Plus, ThumbsUp, Zap } from 'lucide-react'
 import { MapAgentPanel } from './agent/MapAgentPanel'
+import { IdeaListCard } from './ideas/IdeaListCard'
+import { resolveIdeaIconKind } from './ideas/ideaVisuals'
+import { publicPhotoUrl } from './lib/storage'
 import { ApplicationEditor } from './applications/ApplicationEditor'
 import {
   PrepareApplicationForm,
@@ -207,7 +210,7 @@ function App() {
       description: demo.description,
       category: demo.category,
       district_code: demo.district,
-      photo_path: null,
+      photo_path: demo.photoPath ?? null,
       support_threshold: demo.supportThreshold,
       likes_count: demo.likesCount,
       revision: 1,
@@ -278,32 +281,54 @@ function App() {
 
   return (
     <div className="min-h-svh flex flex-col">
-      <header className="shrink-0 px-4 py-3 border-b border-black/5 bg-white/90 backdrop-blur z-20">
+      <header className="shrink-0 px-4 py-3 border-b border-[var(--color-outline)] bg-white z-20 shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
         <div className="mx-auto max-w-6xl flex items-center justify-between gap-3">
           <div
-            className="min-w-0 cursor-pointer group"
+            className="min-w-0 cursor-pointer group flex items-center gap-2.5"
             onClick={handleLogoClick}
           >
-            <h1 className="text-xl font-semibold m-0">
+            <span
+              className="w-10 h-10 rounded-xl bg-[var(--color-primary)] text-[var(--color-primary-ink)] inline-flex items-center justify-center shadow-sm shrink-0"
+              aria-hidden
+            >
+              <Zap size={20} strokeWidth={2.5} />
+            </span>
+            <div className="min-w-0">
+              <h1 className="text-xl font-extrabold m-0 tracking-tight">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleLogoClick()
+                  }}
+                  className="border-0 bg-transparent p-0 cursor-pointer font-extrabold text-xl text-left text-[var(--color-text)] group-hover:opacity-85 transition-opacity"
+                  title="Wróć do mapy"
+                >
+                  {brand.name}
+                </button>
+              </h1>
+              <p className="m-0 text-xs text-[var(--color-text-muted)] hidden sm:block">
+                {brand.tagline}
+                {!online ? ` · ${copy.offlineDraft}` : ''}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <AuthBar />
+            {tab === 'mapa' && (
               <button
                 type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleLogoClick()
+                onClick={() => {
+                  setAddKind(layer === 'usterki' ? 'fault' : 'idea')
+                  setTab('dodaj')
                 }}
-                className="border-0 bg-transparent p-0 cursor-pointer font-semibold text-xl text-left group-hover:opacity-85 transition-opacity"
-                style={{ color: 'var(--color-ideas)' }}
-                title="Wróć do mapy"
+                className="btn-civic-primary hidden sm:inline-flex items-center gap-1.5 h-10 px-3 cursor-pointer"
               >
-                {brand.name}
+                <Plus size={16} />
+                Zgłoś
               </button>
-            </h1>
-            <p className="m-0 text-sm text-[var(--color-text)]/70 hidden sm:block group-hover:text-[var(--color-text)] transition-colors">
-              {brand.tagline}
-              {!online ? ` · ${copy.offlineDraft}` : ''}
-            </p>
+            )}
           </div>
-          <AuthBar />
         </div>
       </header>
 
@@ -523,8 +548,10 @@ function NavButton({
       className="py-2.5 px-3 rounded-lg font-medium border-0 bg-transparent cursor-pointer"
       style={{
         color: active
-          ? 'var(--color-ideas)'
+          ? 'var(--color-primary-ink)'
           : 'color-mix(in srgb, var(--color-text) 55%, transparent)',
+        background: active ? 'var(--color-primary)' : 'transparent',
+        fontWeight: active ? 700 : 500,
       }}
       aria-current={active ? 'page' : undefined}
     >
@@ -672,6 +699,7 @@ function MapScreen({
           sublabel: `${idea.likes_count}/${idea.support_threshold} poparć`,
           highlight: topIdeaIds.has(idea.id),
           selected: idea.id === selectedIdea?.id,
+          iconKind: resolveIdeaIconKind(idea.title, idea.description),
         }))
       }
       return demoIdeas.map((idea) => ({
@@ -683,6 +711,7 @@ function MapScreen({
         sublabel: `${idea.likesCount}/${idea.supportThreshold} poparć`,
         highlight: topIdeaIds.has(idea.id),
         selected: idea.id === selectedIdea?.id,
+        iconKind: resolveIdeaIconKind(idea.title, idea.description),
       }))
     }
     if (faults) {
@@ -769,7 +798,7 @@ function MapScreen({
           <LayerTab
             active={layer === 'pomysly'}
             onClick={() => onLayerChange('pomysly')}
-            accent="var(--color-ideas)"
+            accent="var(--color-primary)"
           >
             Pomysły
           </LayerTab>
@@ -928,8 +957,7 @@ function MapScreen({
         <button
           type="button"
           onClick={onAdd}
-          className="ml-auto inline-flex items-center justify-center min-h-9 md:min-h-11 px-4 rounded-[var(--radius-card)] border-0 text-white text-xs md:text-sm font-semibold cursor-pointer shadow-sm hover:opacity-90 transition-opacity"
-          style={{ background: 'var(--color-action)' }}
+          className="btn-civic-primary ml-auto inline-flex items-center justify-center min-h-9 md:min-h-11 px-4 text-xs md:text-sm cursor-pointer shadow-sm"
         >
           + Dodaj
         </button>
@@ -962,10 +990,10 @@ function MapScreen({
       <div className={`flex-1 min-h-0 grid ${showTopIdeas ? 'md:grid-cols-[minmax(280px,360px)_1fr]' : 'grid-cols-1'}`}>
         {showTopIdeas && (
           <aside
-            className="hidden md:flex flex-col min-h-0 border-r border-black/5 bg-white overflow-y-auto"
+            className="hidden md:flex flex-col min-h-0 border-r border-[var(--color-outline)] bg-[var(--color-bg)] overflow-y-auto"
             aria-label={layer === 'pomysly' ? 'Lista pomysłów' : 'Lista usterek'}
           >
-            <div className="shrink-0 px-3.5 py-2.5 border-b border-black/5 bg-[var(--color-bg)]/60 flex items-center justify-between gap-2 sticky top-0 z-10 backdrop-blur-xs">
+            <div className="shrink-0 px-3.5 py-2.5 border-b border-[var(--color-outline)] bg-white flex items-center justify-between gap-2 sticky top-0 z-10">
               <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--color-text)]">
                 <span>{listTitle}</span>
                 <span className="text-[11px] font-normal text-[var(--color-text)]/50">
@@ -1000,66 +1028,38 @@ function MapScreen({
                   </li>
                 ) : (
                   ideas.map((idea, index) => (
-                    <li key={idea.id}>
-                      <button
-                        type="button"
+                    <li key={idea.id} className="px-3 py-1.5">
+                      <IdeaListCard
+                        title={idea.title}
+                        description={idea.description}
+                        district={idea.district_code ?? 'Kraków'}
+                        likes={idea.likes_count}
+                        threshold={idea.support_threshold}
+                        photoPath={idea.photo_path}
+                        publicUrl={publicPhotoUrl(idea.photo_path)}
+                        rankLabel={index < 3 ? `★ #${index + 1}` : `#${index + 1}`}
+                        selected={selectedIdea?.id === idea.id}
+                        unlocked={idea.likes_count >= idea.support_threshold}
                         onClick={() => onSelectIdea(idea.id)}
-                        className="w-full text-left px-4 py-3 border-0 bg-transparent cursor-pointer hover:bg-black/5 transition-colors"
-                        style={{
-                          background:
-                            selectedIdea?.id === idea.id
-                              ? 'color-mix(in srgb, var(--color-ideas) 8%, white)'
-                              : 'transparent',
-                        }}
-                      >
-                        <div className="flex items-center justify-between gap-1">
-                          <span className="text-[11px] font-bold text-[var(--color-ideas)] uppercase tracking-wider">
-                            {index < 3 ? `★ #${index + 1} TOP` : `#${index + 1}`}
-                          </span>
-                          <span className="text-[11px] text-[var(--color-text)]/50">
-                            {idea.district_code ?? 'Kraków'}
-                          </span>
-                        </div>
-                        <p className="m-0 mt-0.5 font-medium text-sm text-[var(--color-text)]">
-                          {idea.title}
-                        </p>
-                        <div className="mt-1.5 flex items-center justify-between text-xs text-[var(--color-text)]/65">
-                          <span>
-                            👍 <strong>{idea.likes_count}</strong> / {idea.support_threshold} poparć
-                          </span>
-                          <span className="text-[11px] font-medium text-emerald-700">
-                            {idea.likes_count >= idea.support_threshold ? '✓ Odblokowany BO' : 'w toku'}
-                          </span>
-                        </div>
-                      </button>
+                      />
                     </li>
                   ))
                 )
               ) : (
                 demoIdeas.map((idea, index) => (
-                  <li key={idea.id} className="border-b border-black/5">
-                    <button
-                      type="button"
+                  <li key={idea.id} className="px-3 py-1.5">
+                    <IdeaListCard
+                      title={idea.title}
+                      description={idea.description}
+                      district={idea.district}
+                      likes={idea.likesCount}
+                      threshold={idea.supportThreshold}
+                      photoPath={idea.photoPath}
+                      rankLabel={index < 3 ? `★ #${index + 1}` : `#${index + 1}`}
+                      selected={selectedIdea?.id === idea.id}
+                      unlocked={idea.likesCount >= idea.supportThreshold}
                       onClick={() => onSelectIdea(idea.id)}
-                      className="w-full text-left px-4 py-3 border-0 bg-transparent cursor-pointer hover:bg-black/5 transition-colors"
-                      style={{
-                        background:
-                          selectedIdea?.id === idea.id
-                            ? 'color-mix(in srgb, var(--color-ideas) 8%, white)'
-                            : 'transparent',
-                      }}
-                    >
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="font-bold text-[var(--color-ideas)]">
-                          {index < 3 ? `★ #${index + 1} TOP` : `#${index + 1}`}
-                        </span>
-                        <span className="text-[var(--color-text)]/50">{idea.district}</span>
-                      </div>
-                      <p className="m-0 mt-0.5 font-medium text-sm">{idea.title}</p>
-                      <p className="m-0 mt-1 text-xs text-[var(--color-text)]/65">
-                        👍 {idea.likesCount} / {idea.supportThreshold} poparć
-                      </p>
-                    </button>
+                    />
                   </li>
                 ))
               )}
@@ -1279,16 +1279,17 @@ function LayerTab({
   accent: string
   children: string
 }) {
+  const isYellow = accent === 'var(--color-primary)' || accent === '#eab308'
   return (
     <button
       type="button"
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      className="min-h-10 px-3 rounded-[calc(var(--radius-card)-4px)] border-0 text-sm font-medium cursor-pointer"
+      className="min-h-10 px-3 rounded-[calc(var(--radius-card)-4px)] border-0 text-sm font-bold cursor-pointer transition-colors"
       style={{
         background: active ? accent : 'transparent',
-        color: active ? '#fff' : 'var(--color-text)',
+        color: active ? (isYellow ? 'var(--color-primary-ink)' : '#fff') : 'var(--color-text)',
       }}
     >
       {children}
