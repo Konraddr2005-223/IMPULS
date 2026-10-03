@@ -219,7 +219,8 @@ function App() {
   const selectedIdea = useMemo<IdeaRecord | null>(() => {
     if (!selectedIdeaId) return null
     if (ideasFromDb) {
-      return filteredIdeas.find((idea) => idea.id === selectedIdeaId) ?? null
+      const found = filteredIdeas.find((idea) => idea.id === selectedIdeaId)
+      if (found) return found
     }
     const demo = demoIdeas.find((idea) => idea.id === selectedIdeaId)
     return demo ? demoIdeaToRecord(demo) : null
@@ -228,7 +229,8 @@ function App() {
   const selectedFault = useMemo(() => {
     if (!selectedFaultId) return null
     if (faultsFromDb) {
-      return faults.find((f) => f.id === selectedFaultId) ?? null
+      const found = faults.find((f) => f.id === selectedFaultId)
+      if (found) return found
     }
     return demoFaults.find((f) => f.id === selectedFaultId) ?? null
   }, [selectedFaultId, faults, faultsFromDb])
@@ -347,6 +349,7 @@ function App() {
               setDraftPoint(null)
               setLand(null)
               setLandError(null)
+              setMode('mapa')
             }}
             onSelectFault={(id) => {
               setSelectedFaultId(id)
@@ -354,6 +357,7 @@ function App() {
               setDraftPoint(null)
               setLand(null)
               setLandError(null)
+              setMode('mapa')
             }}
             onCloseIdea={() => setSelectedIdeaId(null)}
             onCloseFault={() => setSelectedFaultId(null)}
@@ -679,6 +683,12 @@ function MapScreen({
         })),
     [areas],
   )
+
+  const centerPoint = useMemo(() => {
+    if (selectedIdea) return { lat: selectedIdea.lat, lng: selectedIdea.lng }
+    if (selectedFault) return { lat: selectedFault.lat, lng: selectedFault.lng }
+    return null
+  }, [selectedIdea, selectedFault])
 
   return (
     <div className="flex-1 min-h-0 flex flex-col">
@@ -1012,6 +1022,7 @@ function MapScreen({
             markers={markers}
             circles={circles}
             draftPoint={draftPoint}
+            centerPoint={centerPoint}
             wmsLayer={wmsLayer}
             onMapClick={onMapClick}
             onMarkerClick={(marker) => {

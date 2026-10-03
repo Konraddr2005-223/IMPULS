@@ -1,34 +1,49 @@
-# Demo accounts (role B)
+# Dane demonstracyjne — 10 użytkowników, pomysły, lajki i „Moje okolice”
 
-Create in Supabase Auth (Email provider, Confirm email OFF for demo):
+## Lista 10 użytkowników demonstracyjnych
 
-| Rola | E-mail | Hasło |
-|---|---|---|
-| Autor | `autor@example.com` | `SasiedzkiDemo2026!` |
-| Sąsiad | `sasiad@example.com` | `SasiedzkiDemo2026!` |
+Wszystkie konta posiadają hasło: **`SasiedzkiDemo2026!`**
 
-Then in SQL Editor (order matters):
+| # | Rola / Nazwa | E-mail | Zapisane „Moje okolice” |
+|---|---|---|---|
+| 1 | **Jan Kowalski (Autor)** | `autor@example.com` | Dzielnica: Krowodrza, Promień: Wokół domu - Młynówka (600 m) |
+| 2 | **Piotr Nowak (Sąsiad)** | `sasiad@example.com` | Dzielnice: Krowodrza, Grzegórzki (praca), Promień: Błonia Krakowskie (1000 m) |
+| 3 | **Anna Wiśniewska** | `anna.wisniewska@example.com` | Dzielnica: Grzegórzki, Promień: Bulwary Wiślane (800 m) |
+| 4 | **Tomasz Wójcik** | `tomasz.wojcik@example.com` | Dzielnica: Nowa Huta, Promień: Plac Centralny i Łąki (850 m) |
+| 5 | **Katarzyna Kamińska** | `katarzyna.kaminska@example.com` | Dzielnica: Podgórze, Promień: Park Bednarskiego (500 m) |
+| 6 | **Michał Lewandowski** | `michal.lewandowski@example.com` | Dzielnica: Prądnik Czerwony, Promień: Park Zaczarowanej Dorożki (700 m) |
+| 7 | **Magdalena Zielińska** | `magdalena.zielinska@example.com` | Dzielnica: Dębniki, Promień: Okolice Zakrzówka (1200 m) |
+| 8 | **Paweł Szymański** | `pawel.szymanski@example.com` | Dzielnica: Stare Miasto, Promień: Planty Krakowskie (900 m) |
+| 9 | **Agnieszka Woźniak** | `agnieszka.wozniak@example.com` | Dzielnica: Zwierzyniec, Promień: Park Jordana i Błonia (750 m) |
+| 10 | **Jakub Dąbrowski** | `jakub.dabrowski@example.com` | Dzielnica: Bronowice, Promień: Młynówka Królewska - Bronowice (700 m) |
 
-1. `supabase/seed/reset_demo.sql` (optional clean slate)
-2. `supabase/seed/demo_fake_profiles.sql` — ~18 fikcyjnych profili `demo.liker.01–18@example.com`
-3. `supabase/seed/demo_scenario.sql` — 6 pomysłów, lajki z rekordów, 16 komentarzy, usterki, powiadomienia
-4. `supabase/migrations/PASTE_ME_spatial_likers.sql` (RPC filtrów i likerów), jeśli jeszcze nie
+Każde z powyższych kont można wybrać bezpośrednio z okna logowania w aplikacji (sekcja *Szybkie konta demonstracyjne*).
 
-Or from app: buttons **Autor** / **Sąsiad** create accounts on first login if Confirm email is disabled.
+---
 
-After full seed (§7):
+## Przykładowe pomysły i stan poparcia
 
-| Pomysł | Lajki |
-|---|---:|
-| Zielony zakątek z ławkami | **2/3** (trzeci lajk odblokowuje generator) |
-| Więcej cienia… | 18 |
-| Miejsce odpoczynku dla seniorów | 12 |
-| Sąsiedzkie warsztaty naprawcze | 8 |
-| Piknik na terenie instytucji | 6 |
-| Skwer na terenie innego podmiotu | 4 |
+| Pomysł | Dzielnica | Kategoria | Poparcie (lajki) | Status progu |
+|---|---|---|:---:|:---:|
+| **Zielony zakątek z ławkami i drzewami** | Krowodrza | Inwestycyjny | **7 / 3** | Przekroczony (odblokowany generator) |
+| **Zacieniona aleja spacerowa wzdłuż Wisły** | Grzegórzki | Inwestycyjny | **8 / 5** | Przekroczony |
+| **Sąsiedzkie warsztaty naprawcze i wymiana książek** | Nowa Huta | Nieinwestycyjny | **6 / 5** | Przekroczony |
+| **Strefa odpoczynku i zieleń dla seniorów** | Podgórze | Inwestycyjny | **4 / 5** | W toku (brakuje 1 lajka) |
+| **Bezpieczne doświetlenie skweru i latarnie solarne** | Prądnik Czerwony | Inwestycyjny | **3 / 5** | W toku |
+| **Ogród społeczny i strefa integracji mieszkańców** | Dębniki | Nieinwestycyjny | **2 / 5** | W toku |
 
-Fake liker password (unused in UI): `SasiedzkiDemo2026!`.
+> [!NOTE]
+> Zgodnie z założeniem: **0 usterek w bazie danych**. Tabela `faults` pozostaje czysta.
 
-## Env checklist
+---
 
-See `.env.example`. Client needs only `VITE_SUPABASE_URL` + `VITE_SUPABASE_PUBLISHABLE_KEY`. Never put service role in Vite.
+## Jak wgrać dane do Supabase
+
+### Sposób 1 (Najszybszy — 1 kliknięcie)
+Wklej i uruchom w Supabase SQL Editor plik:
+- **`supabase/seed/seed_10_users_sample_data.sql`**
+
+### Sposób 2 (Krok po kroku)
+1. `supabase/seed/reset_demo.sql` (opcjonalnie wyczyszczenie poprzednich danych)
+2. `supabase/seed/demo_fake_profiles.sql` (utworzenie 10 użytkowników w auth.users i profiles)
+3. `supabase/seed/demo_scenario.sql` (wgranie pomysłów, lajków, komentarzy i „Moich okolic”)

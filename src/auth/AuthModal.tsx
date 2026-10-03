@@ -244,17 +244,17 @@ export function AuthModal({ isOpen, initialMode = 'login', onClose }: AuthModalP
             <span className="block text-center text-[11px] font-medium text-[var(--color-text)]/50 uppercase tracking-wider mb-2.5">
               Szybkie konta demonstracyjne (Hackathon)
             </span>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
               {demoAccounts.map((account) => (
                 <button
                   key={account.key}
                   type="button"
                   disabled={loading || submitting}
                   onClick={() => handleDemoLogin(account.key)}
-                  className="min-h-10 px-3 rounded-xl border border-black/10 bg-[var(--color-bg)] hover:bg-black/5 text-xs font-semibold cursor-pointer text-[var(--color-text)] flex items-center justify-center gap-1.5 transition-colors"
+                  className="min-h-10 px-2.5 rounded-xl border border-black/10 bg-[var(--color-bg)] hover:bg-black/5 text-xs font-semibold cursor-pointer text-[var(--color-text)] flex items-center justify-start gap-1.5 transition-colors"
                 >
-                  <UserIcon size={14} className="text-[var(--color-action)]" />
-                  {account.label}
+                  <UserIcon size={14} className="text-[var(--color-action)] shrink-0" />
+                  <span className="truncate">{account.label}</span>
                 </button>
               ))}
             </div>

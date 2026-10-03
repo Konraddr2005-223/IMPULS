@@ -1,26 +1,91 @@
--- PASTE in Supabase SQL Editor after running demo_fake_profiles.sql.
--- Seeds sample data: 10 users, likes, several ideas, "Moje okolice" (interest areas), and ZERO faults.
+-- ============================================================================
+-- SĄSIEDZKI — KOMPLETNY SKRYPT PRZYKŁADOWYCH DANYCH DLA SUPABASE
+-- Zawiera:
+--   - 10 użytkowników z profilami i hasłami (SasiedzkiDemo2026!)
+--   - 6 pomysłów w Krakowie (różne dzielnice, kategorie)
+--   - Lajki (rozdzielone wg pomysłów — część osiąga próg poparcia, część nie)
+--   - Komentarze dyskusyjne
+--   - "Moje okolice" (interest_areas: dzielnice oraz promienie) dla każdego użytkownika
+--   - 0 usterek ("bez usterek")
+--
+-- Wklej cały ten skrypt w Supabase SQL Editor i kliknij "RUN".
+-- ============================================================================
+
+create extension if not exists pgcrypto;
+create extension if not exists postgis with schema extensions;
 
 do $$
 declare
-  v_u1 uuid;  -- autor@example.com (Jan Kowalski)
-  v_u2 uuid;  -- sasiad@example.com (Piotr Nowak)
-  v_u3 uuid;  -- anna.wisniewska@example.com
-  v_u4 uuid;  -- tomasz.wojcik@example.com
-  v_u5 uuid;  -- katarzyna.kaminska@example.com
-  v_u6 uuid;  -- michal.lewandowski@example.com
-  v_u7 uuid;  -- magdalena.zielinska@example.com
-  v_u8 uuid;  -- pawel.szymanski@example.com
-  v_u9 uuid;  -- agnieszka.wozniak@example.com
-  v_u10 uuid; -- jakub.dabrowski@example.com
+  v_instance uuid;
+  v_i int;
+  v_id uuid;
+  v_email text;
+  v_name text;
+  v_users jsonb := '[
+    {"email": "autor@example.com", "name": "Jan Kowalski (Autor)"},
+    {"email": "sasiad@example.com", "name": "Piotr Nowak (Sąsiad)"},
+    {"email": "anna.wisniewska@example.com", "name": "Anna Wiśniewska"},
+    {"email": "tomasz.wojcik@example.com", "name": "Tomasz Wójcik"},
+    {"email": "katarzyna.kaminska@example.com", "name": "Katarzyna Kamińska"},
+    {"email": "michal.lewandowski@example.com", "name": "Michał Lewandowski"},
+    {"email": "magdalena.zielinska@example.com", "name": "Magdalena Zielińska"},
+    {"email": "pawel.szymanski@example.com", "name": "Paweł Szymański"},
+    {"email": "agnieszka.wozniak@example.com", "name": "Agnieszka Woźniak"},
+    {"email": "jakub.dabrowski@example.com", "name": "Jakub Dąbrowski"}
+  ]'::jsonb;
 
-  v_idea1 uuid;
-  v_idea2 uuid;
-  v_idea3 uuid;
-  v_idea4 uuid;
-  v_idea5 uuid;
-  v_idea6 uuid;
+  v_u1 uuid;  v_u2 uuid;  v_u3 uuid;  v_u4 uuid;  v_u5 uuid;
+  v_u6 uuid;  v_u7 uuid;  v_u8 uuid;  v_u9 uuid;  v_u10 uuid;
+
+  v_idea1 uuid;  v_idea2 uuid;  v_idea3 uuid;
+  v_idea4 uuid;  v_idea5 uuid;  v_idea6 uuid;
 begin
+  select id into v_instance from auth.instances limit 1;
+  if v_instance is null then
+    v_instance := '00000000-0000-0000-0000-000000000000';
+  end if;
+
+  -- 1. Tworzenie 10 kont użytkowników (jeśli jeszcze nie istnieją)
+  for v_i in 0..jsonb_array_length(v_users) - 1 loop
+    v_email := v_users->v_i->>'email';
+    v_name := v_users->v_i->>'name';
+
+    select id into v_id from auth.users where email = v_email limit 1;
+
+    if v_id is null then
+      v_id := gen_random_uuid();
+      insert into auth.users (
+        instance_id, id, aud, role, email, encrypted_password,
+        email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
+        created_at, updated_at, confirmation_token, recovery_token,
+        email_change_token_new, email_change
+      ) values (
+        v_instance, v_id, 'authenticated', 'authenticated', v_email,
+        crypt('SasiedzkiDemo2026!', gen_salt('bf')),
+        now(),
+        '{"provider":"email","providers":["email"]}'::jsonb,
+        jsonb_build_object('display_name', v_name),
+        now(), now(), '', '', '', ''
+      );
+
+      insert into auth.identities (
+        id, user_id, identity_data, provider, provider_id,
+        last_sign_in_at, created_at, updated_at
+      ) values (
+        gen_random_uuid(), v_id,
+        jsonb_build_object('sub', v_id::text, 'email', v_email),
+        'email', v_id::text,
+        now(), now(), now()
+      )
+      on conflict do nothing;
+    end if;
+
+    insert into public.profiles (id, display_name)
+    values (v_id, v_name)
+    on conflict (id) do update set display_name = excluded.display_name;
+  end loop;
+
+  -- Pobieranie ID 10 użytkowników
   select id into v_u1 from auth.users where email = 'autor@example.com' limit 1;
   select id into v_u2 from auth.users where email = 'sasiad@example.com' limit 1;
   select id into v_u3 from auth.users where email = 'anna.wisniewska@example.com' limit 1;
@@ -32,11 +97,7 @@ begin
   select id into v_u9 from auth.users where email = 'agnieszka.wozniak@example.com' limit 1;
   select id into v_u10 from auth.users where email = 'jakub.dabrowski@example.com' limit 1;
 
-  if v_u1 is null or v_u2 is null or v_u3 is null then
-    raise exception 'Uruchom najpierw demo_fake_profiles.sql, aby utworzyć 10 użytkowników demonstracyjnych.';
-  end if;
-
-  -- 1. Ensure city 'krakow' exists
+  -- 2. Upewnij się, że miasto 'krakow' istnieje
   insert into public.cities (id, name, adapter_key, active_edition, rules_version)
   values ('krakow', 'Kraków', 'krakow', '2026-demo', 'krakow-bo-2026-v1')
   on conflict (id) do update set
@@ -46,7 +107,7 @@ begin
     rules_version = excluded.rules_version,
     updated_at = now();
 
-  -- 2. Cleanup demo records
+  -- 3. Czyszczenie poprzednich powiązań demonstracyjnych
   delete from public.notifications where recipient_id in (v_u1, v_u2, v_u3, v_u4, v_u5, v_u6, v_u7, v_u8, v_u9, v_u10);
   delete from public.comments where author_id in (v_u1, v_u2, v_u3, v_u4, v_u5, v_u6, v_u7, v_u8, v_u9, v_u10);
   delete from public.idea_likes where user_id in (v_u1, v_u2, v_u3, v_u4, v_u5, v_u6, v_u7, v_u8, v_u9, v_u10);
@@ -54,10 +115,10 @@ begin
   delete from public.interest_areas where user_id in (v_u1, v_u2, v_u3, v_u4, v_u5, v_u6, v_u7, v_u8, v_u9, v_u10);
   delete from public.ideas where author_id in (v_u1, v_u2, v_u3, v_u4, v_u5, v_u6, v_u7, v_u8, v_u9, v_u10);
 
-  -- "Bez usterek" — ensure faults table is clean
+  -- "Bez usterek" — upewniamy się, że tabela faults jest pusta
   delete from public.faults where city_id = 'krakow';
 
-  -- 3. Insert several ideas (6 ideas across Kraków)
+  -- 4. Pomysły (6 pomysłów w Krakowie)
   insert into public.ideas (
     id, city_id, author_id, title, description, category, location,
     district_code, support_threshold, status
@@ -130,62 +191,41 @@ begin
     'Dębniki', 5, 'published'
   ) returning id into v_idea6;
 
-  -- 4. Likes (lajki od użytkowników)
-  -- Idea 1: 7 lajków (próg 3 -> odblokowany!)
+  -- 5. Lajki (przypisanie głosów poparcia)
+  -- Idea 1: 7 lajków (próg 3 -> przekroczony!)
   insert into public.idea_likes (idea_id, user_id) values
-    (v_idea1, v_u1),
-    (v_idea1, v_u2),
-    (v_idea1, v_u3),
-    (v_idea1, v_u4),
-    (v_idea1, v_u5),
-    (v_idea1, v_u6),
-    (v_idea1, v_u7)
+    (v_idea1, v_u1), (v_idea1, v_u2), (v_idea1, v_u3),
+    (v_idea1, v_u4), (v_idea1, v_u5), (v_idea1, v_u6), (v_idea1, v_u7)
   on conflict do nothing;
 
-  -- Idea 2: 8 lajków (próg 5 -> odblokowany!)
+  -- Idea 2: 8 lajków (próg 5 -> przekroczony!)
   insert into public.idea_likes (idea_id, user_id) values
-    (v_idea2, v_u1),
-    (v_idea2, v_u2),
-    (v_idea2, v_u3),
-    (v_idea2, v_u4),
-    (v_idea2, v_u5),
-    (v_idea2, v_u6),
-    (v_idea2, v_u8),
-    (v_idea2, v_u9)
+    (v_idea2, v_u1), (v_idea2, v_u2), (v_idea2, v_u3), (v_idea2, v_u4),
+    (v_idea2, v_u5), (v_idea2, v_u6), (v_idea2, v_u8), (v_idea2, v_u9)
   on conflict do nothing;
 
-  -- Idea 3: 6 lajków (próg 5 -> odblokowany!)
+  -- Idea 3: 6 lajków (próg 5 -> przekroczony!)
   insert into public.idea_likes (idea_id, user_id) values
-    (v_idea3, v_u1),
-    (v_idea3, v_u2),
-    (v_idea3, v_u4),
-    (v_idea3, v_u5),
-    (v_idea3, v_u8),
-    (v_idea3, v_u10)
+    (v_idea3, v_u1), (v_idea3, v_u2), (v_idea3, v_u4),
+    (v_idea3, v_u5), (v_idea3, v_u8), (v_idea3, v_u10)
   on conflict do nothing;
 
   -- Idea 4: 4 lajki (próg 5 -> 4/5, blisko celu!)
   insert into public.idea_likes (idea_id, user_id) values
-    (v_idea4, v_u2),
-    (v_idea4, v_u5),
-    (v_idea4, v_u6),
-    (v_idea4, v_u7)
+    (v_idea4, v_u2), (v_idea4, v_u5), (v_idea4, v_u6), (v_idea4, v_u7)
   on conflict do nothing;
 
   -- Idea 5: 3 lajki (próg 5 -> 3/5)
   insert into public.idea_likes (idea_id, user_id) values
-    (v_idea5, v_u6),
-    (v_idea5, v_u7),
-    (v_idea5, v_u8)
+    (v_idea5, v_u6), (v_idea5, v_u7), (v_idea5, v_u8)
   on conflict do nothing;
 
   -- Idea 6: 2 lajki (próg 5 -> 2/5)
   insert into public.idea_likes (idea_id, user_id) values
-    (v_idea6, v_u7),
-    (v_idea6, v_u9)
+    (v_idea6, v_u7), (v_idea6, v_u9)
   on conflict do nothing;
 
-  -- 5. Comments (dyskusje sąsiedzkie pod pomysłami)
+  -- 6. Komentarze
   insert into public.comments (idea_id, author_id, body, status) values
     (v_idea1, v_u2, 'Fajnie, gdyby ławki miały oparcie i były w cieniu drzew.', 'visible'),
     (v_idea1, v_u1, 'Celujemy w 4 drzewa miododajne z katalogu BO, które szybko dadzą cień.', 'visible'),
@@ -199,76 +239,67 @@ begin
     (v_idea5, v_u7, 'Po zmroku ten skwer bywa nieprzyjemny, oświetlenie bardzo pomoże.', 'visible'),
     (v_idea6, v_u9, 'Mogę zorganizować sadzonki mięty, lawendy i ziół na otwarcie.', 'visible');
 
-  -- 6. "Moje okolice" (interest_areas dla każdego z 10 użytkowników)
-  -- Użytkownik 1: Jan Kowalski (Krowodrza + promień)
+  -- 7. "Moje okolice" (interest_areas dla 10 użytkowników)
   insert into public.interest_areas (user_id, city_id, name, kind, district_code, lat, lng, radius_m, center) values
+    -- Użytkownik 1: Jan Kowalski (Krowodrza + promień wokół domu)
     (v_u1, 'krakow', 'Krowodrza', 'district', 'Krowodrza', null, null, null, null),
     (v_u1, 'krakow', 'Wokół domu - Młynówka', 'radius', null, 50.0710, 19.9180, 600,
-     ST_SetSRID(ST_MakePoint(19.9180, 50.0710), 4326)::geography);
+     ST_SetSRID(ST_MakePoint(19.9180, 50.0710), 4326)::geography),
 
-  -- Użytkownik 2: Piotr Nowak (Krowodrza, Grzegórzki + Błonia promień)
-  insert into public.interest_areas (user_id, city_id, name, kind, district_code, lat, lng, radius_m, center) values
+    -- Użytkownik 2: Piotr Nowak (Krowodrza, Grzegórzki + Błonia)
     (v_u2, 'krakow', 'Krowodrza', 'district', 'Krowodrza', null, null, null, null),
     (v_u2, 'krakow', 'Grzegórzki (praca)', 'district', 'Grzegórzki', null, null, null, null),
     (v_u2, 'krakow', 'Błonia Krakowskie', 'radius', null, 50.0600, 19.9100, 1000,
-     ST_SetSRID(ST_MakePoint(19.9100, 50.0600), 4326)::geography);
+     ST_SetSRID(ST_MakePoint(19.9100, 50.0600), 4326)::geography),
 
-  -- Użytkownik 3: Anna Wiśniewska (Grzegórzki + Bulwary)
-  insert into public.interest_areas (user_id, city_id, name, kind, district_code, lat, lng, radius_m, center) values
+    -- Użytkownik 3: Anna Wiśniewska (Grzegórzki + Bulwary)
     (v_u3, 'krakow', 'Grzegórzki', 'district', 'Grzegórzki', null, null, null, null),
     (v_u3, 'krakow', 'Bulwary Wiślane', 'radius', null, 50.0550, 19.9600, 800,
-     ST_SetSRID(ST_MakePoint(19.9600, 50.0550), 4326)::geography);
+     ST_SetSRID(ST_MakePoint(19.9600, 50.0550), 4326)::geography),
 
-  -- Użytkownik 4: Tomasz Wójcik (Nowa Huta + Plac Centralny)
-  insert into public.interest_areas (user_id, city_id, name, kind, district_code, lat, lng, radius_m, center) values
+    -- Użytkownik 4: Tomasz Wójcik (Nowa Huta + Plac Centralny)
     (v_u4, 'krakow', 'Nowa Huta', 'district', 'Nowa Huta', null, null, null, null),
     (v_u4, 'krakow', 'Plac Centralny i Łąki', 'radius', null, 50.0720, 20.0370, 850,
-     ST_SetSRID(ST_MakePoint(20.0370, 50.0720), 4326)::geography);
+     ST_SetSRID(ST_MakePoint(20.0370, 50.0720), 4326)::geography),
 
-  -- Użytkownik 5: Katarzyna Kamińska (Podgórze + Park Bednarskiego)
-  insert into public.interest_areas (user_id, city_id, name, kind, district_code, lat, lng, radius_m, center) values
+    -- Użytkownik 5: Katarzyna Kamińska (Podgórze + Park Bednarskiego)
     (v_u5, 'krakow', 'Podgórze', 'district', 'Podgórze', null, null, null, null),
     (v_u5, 'krakow', 'Park Bednarskiego', 'radius', null, 50.0450, 19.9480, 500,
-     ST_SetSRID(ST_MakePoint(19.9480, 50.0450), 4326)::geography);
+     ST_SetSRID(ST_MakePoint(19.9480, 50.0450), 4326)::geography),
 
-  -- Użytkownik 6: Michał Lewandowski (Prądnik Czerwony + Park)
-  insert into public.interest_areas (user_id, city_id, name, kind, district_code, lat, lng, radius_m, center) values
+    -- Użytkownik 6: Michał Lewandowski (Prądnik Czerwony + Park)
     (v_u6, 'krakow', 'Prądnik Czerwony', 'district', 'Prądnik Czerwony', null, null, null, null),
     (v_u6, 'krakow', 'Park Zaczarowanej Dorożki', 'radius', null, 50.0760, 19.9460, 700,
-     ST_SetSRID(ST_MakePoint(19.9460, 50.0760), 4326)::geography);
+     ST_SetSRID(ST_MakePoint(19.9460, 50.0760), 4326)::geography),
 
-  -- Użytkownik 7: Magdalena Zielińska (Dębniki + Zakrzówek)
-  insert into public.interest_areas (user_id, city_id, name, kind, district_code, lat, lng, radius_m, center) values
+    -- Użytkownik 7: Magdalena Zielińska (Dębniki + Zakrzówek)
     (v_u7, 'krakow', 'Dębniki', 'district', 'Dębniki', null, null, null, null),
     (v_u7, 'krakow', 'Okolice Zakrzówka', 'radius', null, 50.0420, 19.9150, 1200,
-     ST_SetSRID(ST_MakePoint(19.9150, 50.0420), 4326)::geography);
+     ST_SetSRID(ST_MakePoint(19.9150, 50.0420), 4326)::geography),
 
-  -- Użytkownik 8: Paweł Szymański (Stare Miasto + Planty)
-  insert into public.interest_areas (user_id, city_id, name, kind, district_code, lat, lng, radius_m, center) values
+    -- Użytkownik 8: Paweł Szymański (Stare Miasto + Planty)
     (v_u8, 'krakow', 'Stare Miasto', 'district', 'Stare Miasto', null, null, null, null),
     (v_u8, 'krakow', 'Planty Krakowskie', 'radius', null, 50.0620, 19.9380, 900,
-     ST_SetSRID(ST_MakePoint(19.9380, 50.0620), 4326)::geography);
+     ST_SetSRID(ST_MakePoint(19.9380, 50.0620), 4326)::geography),
 
-  -- Użytkownik 9: Agnieszka Woźniak (Zwierzyniec + Park Jordana)
-  insert into public.interest_areas (user_id, city_id, name, kind, district_code, lat, lng, radius_m, center) values
+    -- Użytkownik 9: Agnieszka Woźniak (Zwierzyniec + Park Jordana)
     (v_u9, 'krakow', 'Zwierzyniec', 'district', 'Zwierzyniec', null, null, null, null),
     (v_u9, 'krakow', 'Park Jordana i Błonia', 'radius', null, 50.0610, 19.9050, 750,
-     ST_SetSRID(ST_MakePoint(19.9050, 50.0610), 4326)::geography);
+     ST_SetSRID(ST_MakePoint(19.9050, 50.0610), 4326)::geography),
 
-  -- Użytkownik 10: Jakub Dąbrowski (Bronowice + Młynówka)
-  insert into public.interest_areas (user_id, city_id, name, kind, district_code, lat, lng, radius_m, center) values
+    -- Użytkownik 10: Jakub Dąbrowski (Bronowice + Młynówka)
     (v_u10, 'krakow', 'Bronowice', 'district', 'Bronowice', null, null, null, null),
     (v_u10, 'krakow', 'Młynówka Królewska - Bronowice', 'radius', null, 50.0780, 19.8950, 700,
      ST_SetSRID(ST_MakePoint(19.8950, 50.0780), 4326)::geography);
 
-  -- 7. Notifications
+  -- 8. Powiadomienia
   insert into public.notifications (recipient_id, idea_id, type, event_key, payload, read_at)
   values
   (
     v_u1, v_idea1, 'threshold_reached', 'threshold:' || v_idea1::text || ':3',
     jsonb_build_object(
       'title', 'Zielony zakątek z ławkami i drzewami',
-      'message', 'Twój pomysł osiągnął wymagany próg poparcia (7/3)! Możesz teraz przygotować wniosek BO.'
+      'message', 'Twój pomysł osiągnął próg poparcia (7/3)! Możesz teraz przygotować wniosek BO.'
     ),
     now()
   ),
@@ -282,6 +313,6 @@ begin
   )
   on conflict (recipient_id, event_key) do nothing;
 
-  raise notice 'Seed zakończony pomyślnie!';
+  raise notice 'Kompletny seed zakończony sukcesem!';
   raise notice '10 użytkowników, 6 pomysłów, lajki przypisane, "Moje okolice" skonfigurowane, 0 usterek.';
 end $$;

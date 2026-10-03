@@ -8,14 +8,19 @@ import { AuthProvider } from './auth/AuthContext'
 vi.mock('./map/MapCanvas', () => ({
   MapCanvas: ({
     className,
+    centerPoint,
     onMapClick,
     onMarkerClick,
   }: {
     className?: string
+    centerPoint?: { lat: number; lng: number } | null
     onMapClick?: (point: { lat: number; lng: number }) => void
     onMarkerClick?: (marker: { id: string; lat: number; lng: number; kind: 'idea' | 'fault'; label: string }) => void
   }) => (
     <div>
+      <div data-testid="map-center-point">
+        {centerPoint ? `${centerPoint.lat},${centerPoint.lng}` : 'none'}
+      </div>
       <button
         type="button"
         data-testid="map-canvas"
@@ -158,5 +163,14 @@ describe('App shell', () => {
     await user.click(screen.getByTestId('map-marker-idea'))
     expect(await screen.findByLabelText('Szczegóły pomysłu')).toBeInTheDocument()
     expect(screen.queryByLabelText('Karta terenu')).not.toBeInTheDocument()
+  })
+
+  it('centers map on selected idea when clicked from the list', async () => {
+    const user = userEvent.setup()
+    renderApp()
+    await user.click(screen.getByRole('button', { name: 'Lista' }))
+    const ideaButton = await screen.findByRole('button', { name: /Zielony zakątek z ławkami/i })
+    await user.click(ideaButton)
+    expect(screen.getByTestId('map-center-point').textContent).toMatch(/^50\.07/)
   })
 })

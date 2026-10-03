@@ -1,4 +1,4 @@
-import { Fragment, useRef } from 'react'
+import { Fragment, useEffect, useRef } from 'react'
 import {
   Circle,
   CircleMarker,
@@ -6,6 +6,7 @@ import {
   TileLayer,
   Tooltip,
   WMSTileLayer,
+  useMap,
   useMapEvents,
 } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -42,6 +43,7 @@ type MapCanvasProps = {
   markers?: MapMarker[]
   circles?: MapCircle[]
   draftPoint?: { lat: number; lng: number } | null
+  centerPoint?: { lat: number; lng: number } | null
   wmsLayer?: WmsLayerId
   onMapClick?: (point: { lat: number; lng: number }) => void
   onMarkerClick?: (marker: MapMarker) => void
@@ -117,6 +119,38 @@ function ClickHandler({
   return null
 }
 
+function MapCenterController({
+  centerPoint,
+}: {
+  centerPoint?: { lat: number; lng: number } | null
+}) {
+  const map = useMap()
+  const lastAnimatedCenterRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!centerPoint || isNaN(centerPoint.lat) || isNaN(centerPoint.lng)) {
+      return
+    }
+
+    const key = `${centerPoint.lat.toFixed(5)},${centerPoint.lng.toFixed(5)}`
+    if (lastAnimatedCenterRef.current === key) {
+      return
+    }
+    lastAnimatedCenterRef.current = key
+
+    const currentZoom = map.getZoom()
+    const targetZoom = Math.max(currentZoom, 15)
+
+    // Smooth camera flyTo animation
+    map.flyTo([centerPoint.lat, centerPoint.lng], targetZoom, {
+      duration: 0.8,
+      easeLinearity: 0.25,
+    })
+  }, [centerPoint, map])
+
+  return null
+}
+
 const wmsConfigs = {
   ownership: wmsSources.find((s) => s.id === 'ownership'),
   mpzp: wmsSources.find((s) => s.id === 'mpzp'),
@@ -127,6 +161,7 @@ export function MapCanvas({
   markers = [],
   circles = [],
   draftPoint,
+  centerPoint,
   wmsLayer = 'none',
   onMapClick,
   onMarkerClick,
@@ -142,6 +177,7 @@ export function MapCanvas({
       aria-label="Mapa Krakowa"
     >
       <TileLayer attribution={OSM_ATTRIBUTION} url={OSM_TILE_URL} />
+      <MapCenterController centerPoint={centerPoint} />
 
       {wmsLayer === 'mpzp' && wmsConfigs.mpzp && (
         <WMSTileLayer
@@ -224,17 +260,33 @@ export function MapCanvas({
         return (
           <Fragment key={marker.id}>
             {marker.selected && (
-              <CircleMarker
-                center={[marker.lat, marker.lng]}
-                radius={20}
-                pathOptions={{
-                  color: color,
-                  fillColor: color,
-                  fillOpacity: 0.2,
-                  weight: 2,
-                  dashArray: '3, 3',
-                }}
-              />
+              <>
+                {/* Outer animated radar pulse ring */}
+                <CircleMarker
+                  center={[marker.lat, marker.lng]}
+                  radius={24}
+                  pathOptions={{
+                    color: color,
+                    fillColor: color,
+                    fillOpacity: 0.15,
+                    weight: 2,
+                    dashArray: '3, 4',
+                    className: 'selected-marker-pulse',
+                  }}
+                />
+                {/* Inner breathing glow ring */}
+                <CircleMarker
+                  center={[marker.lat, marker.lng]}
+                  radius={18}
+                  pathOptions={{
+                    color: color,
+                    fillColor: color,
+                    fillOpacity: 0.25,
+                    weight: 2.5,
+                    className: 'selected-marker-ring',
+                  }}
+                />
+              </>
             )}
             <CircleMarker
               center={[marker.lat, marker.lng]}
@@ -243,7 +295,7 @@ export function MapCanvas({
                 color: marker.selected ? '#ffffff' : marker.highlight ? '#FBBF24' : color,
                 fillColor: color,
                 fillOpacity: 0.95,
-                weight: marker.selected ? 3 : marker.highlight ? 3 : 2,
+                weight: marker.selected ? 3.5 : marker.highlight ? 3 : 2,
               }}
               eventHandlers={{
                 click: (event) => {

@@ -56,9 +56,20 @@ describe('MapCanvas', () => {
       />,
     )
 
-    // With selected: true, it renders two CircleMarkers (halo + center dot)
+    // With selected: true, it renders animated pulse rings and center marker (3 CircleMarkers)
     const paths = container.querySelectorAll('path.leaflet-interactive')
-    expect(paths.length).toBe(2)
+    expect(paths.length).toBe(3)
+  })
+
+  it('accepts centerPoint and renders without errors', () => {
+    const { container } = render(
+      <MapCanvas
+        centerPoint={{ lat: 50.07, lng: 19.91 }}
+        markers={[]}
+        onMapClick={vi.fn()}
+      />,
+    )
+    expect(container.querySelector('.leaflet-container')).toBeInTheDocument()
   })
 
   it('exports PROXIMITY_THRESHOLD_PX constant of at least 28px', () => {
