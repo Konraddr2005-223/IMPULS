@@ -1,7 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { AuthBar } from './auth/AuthBar'
+import { useAuth } from './auth/AuthContext'
 import { krakowAdapter } from './city'
 import type { LandAssessment } from './city/types'
 import { DEMO_DISCLAIMER, demoFaults, demoIdeas } from './data/demoContent'
+import { CreateIdeaForm } from './ideas/CreateIdeaForm'
+import { fetchPublishedIdeas } from './ideas/api'
+import type { IdeaRecord } from './ideas/types'
 import { isSupabaseConfigured } from './lib/supabase'
 import { LandCard } from './map/LandCard'
 import { MapCanvas, type MapMarker } from './map/MapCanvas'
@@ -19,14 +24,44 @@ const TABS: { id: TabId; label: string }[] = [
 ]
 
 function App() {
+  const { user, displayName } = useAuth()
   const [tab, setTab] = useState<TabId>('mapa')
   const [layer, setLayer] = useState<MapLayer>('pomysly')
   const [mode, setMode] = useState<MapMode>('mapa')
   const [land, setLand] = useState<LandAssessment | null>(null)
   const [landLoading, setLandLoading] = useState(false)
   const [landError, setLandError] = useState<string | null>(null)
+  const [draftPoint, setDraftPoint] = useState<{ lat: number; lng: number } | null>(
+    null,
+  )
+  const [ideas, setIdeas] = useState<IdeaRecord[]>([])
+  const [ideasSource, setIdeasSource] = useState<'db' | 'demo'>('demo')
+  const [ideasError, setIdeasError] = useState<string | null>(null)
+
+  async function loadIdeas() {
+    if (!isSupabaseConfigured) {
+      setIdeas([])
+      setIdeasSource('demo')
+      return
+    }
+    try {
+      const rows = await fetchPublishedIdeas()
+      setIdeas(rows)
+      setIdeasSource(rows.length > 0 ? 'db' : 'demo')
+      setIdeasError(null)
+    } catch (err) {
+      setIdeas([])
+      setIdeasSource('demo')
+      setIdeasError(err instanceof Error ? err.message : 'Błąd odczytu pomysłów')
+    }
+  }
+
+  useEffect(() => {
+    void loadIdeas()
+  }, [])
 
   async function handleMapClick(point: { lat: number; lng: number }) {
+    setDraftPoint(point)
     setLandLoading(true)
     setLandError(null)
     try {
@@ -40,25 +75,35 @@ function App() {
     }
   }
 
+  const listIdeas = ideasSource === 'db' ? ideas : null
+
   return (
     <div className="min-h-svh flex flex-col">
       <header className="shrink-0 px-4 py-3 border-b border-black/5 bg-white/90 backdrop-blur z-20">
-        <div className="mx-auto max-w-6xl flex items-baseline justify-between gap-3">
-          <h1 className="text-xl font-semibold m-0" style={{ color: 'var(--color-ideas)' }}>
-            {brand.name}
-          </h1>
-          <p className="m-0 text-sm text-[var(--color-text)]/70 hidden sm:block">{brand.tagline}</p>
+        <div className="mx-auto max-w-6xl flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold m-0" style={{ color: 'var(--color-ideas)' }}>
+              {brand.name}
+            </h1>
+            <p className="m-0 text-sm text-[var(--color-text)]/70 hidden sm:block">
+              {brand.tagline}
+            </p>
+          </div>
+          <AuthBar />
         </div>
       </header>
 
       <main className="flex-1 min-h-0 flex flex-col">
-        {tab === 'mapa' ? (
+        {tab === 'mapa' && (
           <MapScreen
             layer={layer}
             mode={mode}
             land={land}
             landLoading={landLoading}
             landError={landError}
+            ideas={listIdeas}
+            ideasSource={ideasSource}
+            ideasError={ideasError}
             onLayerChange={setLayer}
             onModeChange={setMode}
             onAdd={() => setTab('dodaj')}
@@ -68,8 +113,31 @@ function App() {
               setLandError(null)
             }}
           />
-        ) : (
-          <PlaceholderScreen tab={tab} />
+        )}
+        {tab === 'dodaj' && (
+          <CreateIdeaForm
+            initialPoint={draftPoint}
+            onCreated={() => {
+              void loadIdeas()
+              setTab('mapa')
+            }}
+          />
+        )}
+        {tab === 'powiadomienia' && (
+          <PlaceholderScreen
+            title="Powiadomienia"
+            body="Zdarzenia z okolicy i statusy zgłoszeń."
+          />
+        )}
+        {tab === 'moje' && (
+          <PlaceholderScreen
+            title="Moje"
+            body={
+              user
+                ? `Zalogowano jako ${displayName ?? user.email}. Twoje pomysły i dokumenty pojawią się tutaj.`
+                : 'Zaloguj się kontem prezentacyjnym (Autor / Sąsiad w nagłówku), aby zarządzać wpisami.'
+            }
+          />
         )}
       </main>
 
@@ -126,6 +194,9 @@ type MapScreenProps = {
   land: LandAssessment | null
   landLoading: boolean
   landError: string | null
+  ideas: IdeaRecord[] | null
+  ideasSource: 'db' | 'demo'
+  ideasError: string | null
   onLayerChange: (layer: MapLayer) => void
   onModeChange: (mode: MapMode) => void
   onAdd: () => void
@@ -139,6 +210,9 @@ function MapScreen({
   land,
   landLoading,
   landError,
+  ideas,
+  ideasSource,
+  ideasError,
   onLayerChange,
   onModeChange,
   onAdd,
@@ -147,6 +221,15 @@ function MapScreen({
 }: MapScreenProps) {
   const markers: MapMarker[] = useMemo(() => {
     if (layer === 'pomysly') {
+      if (ideas) {
+        return ideas.map((idea) => ({
+          id: idea.id,
+          lat: idea.lat,
+          lng: idea.lng,
+          kind: 'idea' as const,
+          label: idea.title,
+        }))
+      }
       return demoIdeas.map((idea) => ({
         id: idea.id,
         lat: idea.lat,
@@ -162,7 +245,7 @@ function MapScreen({
       kind: 'fault' as const,
       label: fault.title,
     }))
-  }, [layer])
+  }, [layer, ideas])
 
   return (
     <div className="flex-1 min-h-0 flex flex-col">
@@ -213,7 +296,9 @@ function MapScreen({
 
       <p className="m-0 px-3 py-1.5 text-xs text-[var(--color-text)]/60 bg-[var(--color-bg)] border-b border-black/5">
         {DEMO_DISCLAIMER}
-        {isSupabaseConfigured ? ' · Supabase: skonfigurowany' : ' · Supabase: brak konfiguracji'}
+        {isSupabaseConfigured ? ' · Supabase: OK' : ' · Supabase: brak konfiguracji'}
+        {` · Źródło pomysłów: ${ideasSource === 'db' ? 'baza' : 'dane lokalne'}`}
+        {ideasError ? ` · ${ideasError}` : ''}
         {' · Kliknij mapę, aby sprawdzić teren (dane demo).'}
       </p>
 
@@ -224,14 +309,24 @@ function MapScreen({
         >
           {layer === 'pomysly' ? (
             <ul className="m-0 p-0 list-none">
-              {demoIdeas.map((idea) => (
-                <li key={idea.id} className="border-b border-black/5 px-4 py-3">
-                  <p className="m-0 font-medium">{idea.title}</p>
-                  <p className="m-0 mt-1 text-sm text-[var(--color-text)]/65">
-                    {idea.district} · {idea.likesCount}/{idea.supportThreshold} poparć
-                  </p>
-                </li>
-              ))}
+              {ideas
+                ? ideas.map((idea) => (
+                    <li key={idea.id} className="border-b border-black/5 px-4 py-3">
+                      <p className="m-0 font-medium">{idea.title}</p>
+                      <p className="m-0 mt-1 text-sm text-[var(--color-text)]/65">
+                        {idea.district_code ?? 'Kraków'} · {idea.likes_count}/
+                        {idea.support_threshold} poparć
+                      </p>
+                    </li>
+                  ))
+                : demoIdeas.map((idea) => (
+                    <li key={idea.id} className="border-b border-black/5 px-4 py-3">
+                      <p className="m-0 font-medium">{idea.title}</p>
+                      <p className="m-0 mt-1 text-sm text-[var(--color-text)]/65">
+                        {idea.district} · {idea.likesCount}/{idea.supportThreshold} poparć
+                      </p>
+                    </li>
+                  ))}
             </ul>
           ) : (
             <ul className="m-0 p-0 list-none">
@@ -332,24 +427,7 @@ function ModeButton({
   )
 }
 
-function PlaceholderScreen({ tab }: { tab: Exclude<TabId, 'mapa'> }) {
-  const copy: Record<Exclude<TabId, 'mapa'>, { title: string; body: string }> = {
-    dodaj: {
-      title: 'Dodaj',
-      body: 'Formularz pomysłu lub usterki pojawi się tutaj.',
-    },
-    powiadomienia: {
-      title: 'Powiadomienia',
-      body: 'Zdarzenia z okolicy i statusy zgłoszeń.',
-    },
-    moje: {
-      title: 'Moje',
-      body: 'Twoje pomysły, dokumenty i usterki.',
-    },
-  }
-
-  const { title, body } = copy[tab]
-
+function PlaceholderScreen({ title, body }: { title: string; body: string }) {
   return (
     <div className="flex-1 mx-auto w-full max-w-6xl px-4 py-8">
       <section

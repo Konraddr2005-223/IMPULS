@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import App from './App'
+import { AuthProvider } from './auth/AuthContext'
 
 vi.mock('./map/MapCanvas', () => ({
   MapCanvas: ({
@@ -21,9 +22,22 @@ vi.mock('./map/MapCanvas', () => ({
   ),
 }))
 
+vi.mock('./ideas/api', () => ({
+  fetchPublishedIdeas: vi.fn(async () => []),
+  createIdea: vi.fn(),
+}))
+
+function renderApp() {
+  return render(
+    <AuthProvider>
+      <App />
+    </AuthProvider>,
+  )
+}
+
 describe('App shell', () => {
   it('renders brand, navigation and demo ideas', () => {
-    render(<App />)
+    renderApp()
 
     expect(screen.getByRole('heading', { name: 'Sąsiedzki' })).toBeInTheDocument()
 
@@ -34,18 +48,19 @@ describe('App shell', () => {
 
   it('shows land card after map click on a demo point', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    renderApp()
 
     await user.click(screen.getByTestId('map-canvas'))
     expect(await screen.findByLabelText('Karta terenu')).toBeInTheDocument()
     expect(screen.getByText(/Scenariusz demonstracyjny/i)).toBeInTheDocument()
   })
 
-  it('switches to faults layer', async () => {
+  it('opens create idea form from Dodaj tab', async () => {
     const user = userEvent.setup()
-    render(<App />)
+    renderApp()
 
-    await user.click(screen.getByRole('tab', { name: 'Usterki' }))
-    expect(screen.getByText('Uszkodzona ławka')).toBeInTheDocument()
+    const nav = screen.getByRole('navigation', { name: 'Nawigacja dolna' })
+    await user.click(within(nav).getByRole('button', { name: 'Dodaj' }))
+    expect(screen.getByRole('heading', { name: 'Dodaj pomysł' })).toBeInTheDocument()
   })
 })
