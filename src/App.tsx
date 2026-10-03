@@ -1044,7 +1044,7 @@ function MapScreen({
           <button
             type="button"
             onClick={() => setShowTopIdeas(true)}
-            className="hidden md:inline-flex absolute top-3 left-3 z-10 items-center gap-1.5 px-3 py-2 rounded-[var(--radius-card)] bg-white/95 backdrop-blur-xs border border-black/10 shadow-md text-xs font-semibold text-[var(--color-text)] hover:bg-white cursor-pointer transition-all hover:shadow-lg"
+            className="hidden md:inline-flex absolute top-3 left-14 z-10 items-center gap-1.5 px-3 py-2 rounded-[var(--radius-card)] bg-white/95 backdrop-blur-xs border border-black/10 shadow-md text-xs font-semibold text-[var(--color-text)] hover:bg-white cursor-pointer transition-all hover:shadow-lg"
             title={showButtonLabel}
             aria-label={showButtonLabel}
           >
