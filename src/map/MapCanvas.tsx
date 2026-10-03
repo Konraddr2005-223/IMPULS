@@ -14,6 +14,7 @@ import {
   OSM_ATTRIBUTION,
   OSM_TILE_URL,
 } from './krakow'
+import { DistrictsLayer } from './DistrictsLayer'
 import { wmsSources } from '../city/krakow/config'
 
 export type MapMarker = {
@@ -41,6 +42,10 @@ type MapCanvasProps = {
   circles?: MapCircle[]
   draftPoint?: { lat: number; lng: number } | null
   wmsLayer?: WmsLayerId
+  /** Draw Kraków administrative district polygons. */
+  showDistricts?: boolean
+  /** Interest-area district codes to highlight on the overlay. */
+  highlightedDistricts?: string[]
   onMapClick?: (point: { lat: number; lng: number }) => void
   onMarkerClick?: (marker: MapMarker) => void
 }
@@ -69,6 +74,8 @@ export function MapCanvas({
   circles = [],
   draftPoint,
   wmsLayer = 'none',
+  showDistricts = false,
+  highlightedDistricts = [],
   onMapClick,
   onMarkerClick,
 }: MapCanvasProps) {
@@ -102,6 +109,10 @@ export function MapCanvas({
           opacity={0.65}
           attribution="&copy; MSIP Kraków — Struktura Własności"
         />
+      )}
+
+      {showDistricts && (
+        <DistrictsLayer highlightedDistricts={highlightedDistricts} />
       )}
 
       <ClickHandler onMapClick={onMapClick} />

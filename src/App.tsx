@@ -64,6 +64,7 @@ function App() {
   const [filterByAreas, setFilterByAreas] = useState(false)
   const [ideaFilters, setIdeaFilters] = useState<IdeaListFilters>(emptyIdeaFilters)
   const [wmsLayer, setWmsLayer] = useState<WmsLayerId>('none')
+  const [showDistricts, setShowDistricts] = useState(true)
   const [land, setLand] = useState<LandAssessment | null>(null)
   const [landLoading, setLandLoading] = useState(false)
   const [landError, setLandError] = useState<string | null>(null)
@@ -259,6 +260,7 @@ function App() {
             ideaFilters={ideaFilters}
             districtOptions={uniqueDistricts(ideas)}
             wmsLayer={wmsLayer}
+            showDistricts={showDistricts}
             ideasSource={ideasFromDb ? 'db' : 'demo'}
             faultsSource={faultsFromDb ? 'db' : 'demo'}
             selectedIdea={selectedIdea}
@@ -268,6 +270,7 @@ function App() {
             onFilterByAreasChange={setFilterByAreas}
             onIdeaFiltersChange={setIdeaFilters}
             onWmsLayerChange={setWmsLayer}
+            onShowDistrictsChange={setShowDistricts}
             onLayerChange={(next) => {
               setLayer(next)
               setSelectedIdeaId(null)
@@ -444,11 +447,19 @@ type MapScreenProps = {
   ideas: IdeaRecord[] | null
   demoIdeas: typeof demoIdeas
   faults: FaultRecord[] | null
-  areas: { id: string; lat: number | null; lng: number | null; radius_m: number | null; kind: string }[]
+  areas: {
+    id: string
+    lat: number | null
+    lng: number | null
+    radius_m: number | null
+    kind: string
+    district_code: string | null
+  }[]
   filterByAreas: boolean
   ideaFilters: IdeaListFilters
   districtOptions: string[]
   wmsLayer: WmsLayerId
+  showDistricts: boolean
   ideasSource: 'db' | 'demo'
   faultsSource: 'db' | 'demo'
   selectedIdea: IdeaRecord | null
@@ -458,6 +469,7 @@ type MapScreenProps = {
   onFilterByAreasChange: (v: boolean) => void
   onIdeaFiltersChange: (f: IdeaListFilters) => void
   onWmsLayerChange: (layer: WmsLayerId) => void
+  onShowDistrictsChange: (v: boolean) => void
   onLayerChange: (layer: MapLayer) => void
   onModeChange: (mode: MapMode) => void
   onAdd: () => void
@@ -495,6 +507,7 @@ function MapScreen({
   ideaFilters,
   districtOptions,
   wmsLayer,
+  showDistricts,
   ideasSource,
   faultsSource,
   selectedIdea,
@@ -504,6 +517,7 @@ function MapScreen({
   onFilterByAreasChange,
   onIdeaFiltersChange,
   onWmsLayerChange,
+  onShowDistrictsChange,
   onLayerChange,
   onModeChange,
   onAdd,
@@ -592,6 +606,14 @@ function MapScreen({
     [areas],
   )
 
+  const highlightedDistricts = useMemo(
+    () =>
+      areas
+        .filter((a) => a.kind === 'district' && a.district_code)
+        .map((a) => a.district_code as string),
+    [areas],
+  )
+
   return (
     <div className="flex-1 min-h-0 flex flex-col">
       <div className="shrink-0 px-3 py-2 border-b border-black/5 bg-white flex flex-wrap items-center gap-2 z-10">
@@ -656,6 +678,16 @@ function MapScreen({
             className="rounded"
           />
           Moje okolice
+        </label>
+
+        <label className="inline-flex items-center gap-1.5 text-xs text-[var(--color-text)]/75 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={showDistricts}
+            onChange={(e) => onShowDistrictsChange(e.target.checked)}
+            className="rounded"
+          />
+          Dzielnice
         </label>
 
         {layer === 'pomysly' && (
@@ -755,11 +787,18 @@ function MapScreen({
           {DEMO_DISCLAIMER}
           {` · Pomysły: ${ideasSource} · Usterki: ${faultsSource}`}
         </span>
-        {wmsLayer !== 'none' && (
-          <span className="font-semibold text-blue-700">
-            Aktywna warstwa WMS: {wmsLayer === 'mpzp' ? 'MPZP (Plany)' : 'Struktura Własności'}
-          </span>
-        )}
+        <span className="inline-flex items-center gap-2">
+          {showDistricts && (
+            <span className="font-medium text-emerald-800">
+              Obrys dzielnic (poglądowy)
+            </span>
+          )}
+          {wmsLayer !== 'none' && (
+            <span className="font-semibold text-blue-700">
+              WMS: {wmsLayer === 'mpzp' ? 'MPZP (Plany)' : 'Struktura Własności'}
+            </span>
+          )}
+        </span>
       </p>
 
       <div className="flex-1 min-h-0 grid md:grid-cols-[minmax(280px,360px)_1fr]">
@@ -919,6 +958,8 @@ function MapScreen({
             circles={circles}
             draftPoint={draftPoint}
             wmsLayer={wmsLayer}
+            showDistricts={showDistricts}
+            highlightedDistricts={highlightedDistricts}
             onMapClick={onMapClick}
             onMarkerClick={(marker) => {
               if (marker.kind === 'idea') {

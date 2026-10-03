@@ -55,7 +55,8 @@ export function AreasScreen({ draftPoint }: AreasScreenProps) {
       </h2>
       <p className="mt-1 mb-4 text-sm text-[var(--color-text)]/65">
         Dzielnice z listy lub punkt z promieniem 50–2000 m. Filtr mapy łączy obszary operatorem
-        OR. Granice dzielnic nie są rysowane jako oficjalne kształty.
+        OR. Na mapie możesz włączyć poglądowe obrysy dzielnic — wybrane okolice są
+        podświetlone.
       </p>
 
       <section className="rounded-[var(--radius-card)] bg-white p-4 border border-black/5 mb-4">

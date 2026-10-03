@@ -1,0 +1,7 @@
+Kraków administrative districts (dzielnice) GeoJSON.
+
+Source: https://github.com/andilabs/krakow-dzielnice-geojson
+File: krakow-dzielnice.geojson
+
+Used as an orientation overlay in Sąsiedzki — not an official MSIP boundary
+service. Prefer MSIP when a verified WFS/download is available for production.
