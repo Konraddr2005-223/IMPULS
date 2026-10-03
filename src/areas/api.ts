@@ -87,6 +87,49 @@ export async function createRadiusArea(
   if (error) throw error
 }
 
+export async function updateRadiusArea(
+  id: string,
+  userId: string,
+  name: string,
+  lat: number,
+  lng: number,
+  radiusM: number,
+): Promise<void> {
+  if (!supabase) throw new Error('Supabase nie jest skonfigurowany.')
+  if (radiusM < 50 || radiusM > 2000) {
+    throw new Error('Promień musi być w zakresie 50–2000 m.')
+  }
+  const { error } = await supabase
+    .from('interest_areas')
+    .update({
+      name,
+      center: pointWkt(lat, lng),
+      lat,
+      lng,
+      radius_m: radiusM,
+    })
+    .eq('id', id)
+    .eq('user_id', userId)
+  if (error) throw error
+}
+
+export async function updateDistrictArea(
+  id: string,
+  userId: string,
+  districtCode: string,
+): Promise<void> {
+  if (!supabase) throw new Error('Supabase nie jest skonfigurowany.')
+  const { error } = await supabase
+    .from('interest_areas')
+    .update({
+      name: districtCode,
+      district_code: districtCode,
+    })
+    .eq('id', id)
+    .eq('user_id', userId)
+  if (error) throw error
+}
+
 export async function deleteInterestArea(id: string, userId: string) {
   if (!supabase) return
   const { error } = await supabase
