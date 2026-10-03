@@ -205,13 +205,33 @@ function App() {
     return demoFaults.find((f) => f.id === selectedFaultId) ?? null
   }, [selectedFaultId, faults, faultsFromDb])
 
+  function handleLogoClick() {
+    setApplication(null)
+    setPrepareOpen(false)
+    setTab('mapa')
+    setMode('mapa')
+    setMojeView('home')
+    setSelectedIdeaId(null)
+    setSelectedFaultId(null)
+    setLand(null)
+    setLandError(null)
+  }
+
   if (application) {
     return (
       <div className="min-h-svh flex flex-col">
         <header className="shrink-0 px-4 py-3 border-b border-black/5 bg-white/90">
           <div className="mx-auto max-w-6xl flex items-center justify-between">
-            <h1 className="text-xl font-semibold m-0" style={{ color: 'var(--color-ideas)' }}>
-              {brand.name}
+            <h1 className="text-xl font-semibold m-0">
+              <button
+                type="button"
+                onClick={handleLogoClick}
+                className="border-0 bg-transparent p-0 cursor-pointer font-semibold text-xl text-left hover:opacity-85 transition-opacity"
+                style={{ color: 'var(--color-ideas)' }}
+                title="Wróć do mapy"
+              >
+                {brand.name}
+              </button>
             </h1>
             <AuthBar />
           </div>
@@ -229,11 +249,25 @@ function App() {
     <div className="min-h-svh flex flex-col">
       <header className="shrink-0 px-4 py-3 border-b border-black/5 bg-white/90 backdrop-blur z-20">
         <div className="mx-auto max-w-6xl flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="text-xl font-semibold m-0" style={{ color: 'var(--color-ideas)' }}>
-              {brand.name}
+          <div
+            className="min-w-0 cursor-pointer group"
+            onClick={handleLogoClick}
+          >
+            <h1 className="text-xl font-semibold m-0">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  handleLogoClick()
+                }}
+                className="border-0 bg-transparent p-0 cursor-pointer font-semibold text-xl text-left group-hover:opacity-85 transition-opacity"
+                style={{ color: 'var(--color-ideas)' }}
+                title="Wróć do mapy"
+              >
+                {brand.name}
+              </button>
             </h1>
-            <p className="m-0 text-sm text-[var(--color-text)]/70 hidden sm:block">
+            <p className="m-0 text-sm text-[var(--color-text)]/70 hidden sm:block group-hover:text-[var(--color-text)] transition-colors">
               {brand.tagline}
               {!online ? ` · ${copy.offlineDraft}` : ''}
             </p>

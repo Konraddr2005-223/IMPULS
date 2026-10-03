@@ -120,4 +120,16 @@ describe('App shell', () => {
     await user.click(within(nav).getByRole('button', { name: 'Dodaj' }))
     expect(screen.getByRole('heading', { name: 'Dodaj pomysł' })).toBeInTheDocument()
   })
+
+  it('navigates back to map screen when logo is clicked', async () => {
+    const user = userEvent.setup()
+    renderApp()
+    const nav = screen.getByRole('navigation', { name: 'Nawigacja dolna' })
+    await user.click(within(nav).getByRole('button', { name: 'Dodaj' }))
+    expect(screen.getByRole('heading', { name: 'Dodaj pomysł' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Sąsiedzki' }))
+    expect(screen.getByTestId('map-canvas')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Dodaj pomysł' })).not.toBeInTheDocument()
+  })
 })
