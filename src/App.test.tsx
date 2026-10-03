@@ -183,16 +183,36 @@ describe('App shell', () => {
     renderApp()
     expect(await screen.findByText('Topowe pomysły')).toBeInTheDocument()
 
-    // Click the hide button
-    const hideBtn = screen.getByRole('button', { name: 'Schowaj listę' })
+    // Click the hide button in sidebar header
+    const hideBtn = screen.getByRole('button', { name: /Schowaj/i })
     await user.click(hideBtn)
 
     // The list is now hidden
     expect(screen.queryByText('Topowe pomysły')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Pokaż listę' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Pokaż/i })).toBeInTheDocument()
 
     // Click the show button to bring it back
-    await user.click(screen.getByRole('button', { name: 'Pokaż listę' }))
+    await user.click(screen.getByRole('button', { name: /Pokaż/i }))
     expect(await screen.findByText('Topowe pomysły')).toBeInTheDocument()
+  })
+
+  it('filters ideas by likes using segmented likes filter buttons', async () => {
+    const user = userEvent.setup()
+    renderApp()
+    expect(await screen.findByText('Topowe pomysły')).toBeInTheDocument()
+    expect(screen.getByText('Zielony zakątek z ławkami')).toBeInTheDocument()
+
+    // Filter by 3+ likes (mock idea only has 2 likes, so it should be filtered out)
+    const filter3Plus = screen.getByRole('button', { name: /Minimum 3 poparć/i })
+    expect(filter3Plus).toBeInTheDocument()
+    await user.click(filter3Plus)
+    expect(filter3Plus).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByText('Zielony zakątek z ławkami')).not.toBeInTheDocument()
+
+    // Reset back to all ideas via "Wszystkie"
+    const filterAll = screen.getByRole('button', { name: 'Wszystkie pomysły' })
+    await user.click(filterAll)
+    expect(filterAll).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByText('Zielony zakątek z ławkami')).toBeInTheDocument()
   })
 })

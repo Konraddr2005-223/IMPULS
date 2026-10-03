@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
-import { Layers, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { PanelLeftClose, PanelLeftOpen, ThumbsUp } from 'lucide-react'
 import { ApplicationEditor } from './applications/ApplicationEditor'
 import {
   PrepareApplicationForm,
@@ -530,7 +530,7 @@ type MapScreenProps = {
   userId: string | null
   onFilterByAreasChange: (v: boolean) => void
   onIdeaFiltersChange: (f: IdeaListFilters) => void
-  onWmsLayerChange: (layer: WmsLayerId) => void
+  onWmsLayerChange?: (layer: WmsLayerId) => void
   onLayerChange: (layer: MapLayer) => void
   onAdd: () => void
   onMapClick: (point: { lat: number; lng: number }) => void
@@ -576,7 +576,7 @@ function MapScreen({
   userId,
   onFilterByAreasChange,
   onIdeaFiltersChange,
-  onWmsLayerChange,
+  onWmsLayerChange: _onWmsLayerChange,
   onLayerChange,
   onAdd,
   onMapClick,
@@ -793,53 +793,50 @@ function MapScreen({
               <option value="investment">Inwestycyjne</option>
               <option value="non_investment">Nieinwestycyjne</option>
             </select>
-            <label className="inline-flex items-center gap-1 text-[var(--color-text)]/70">
-              Min. lajki
-              <input
-                type="number"
-                min={0}
-                max={50}
-                value={ideaFilters.minLikes}
-                onChange={(e) =>
-                  onIdeaFiltersChange({
-                    ...ideaFilters,
-                    minLikes: Number(e.target.value) || 0,
-                  })
-                }
-                className="w-14 min-h-9 px-2 rounded-[var(--radius-card)] border border-black/10 bg-white"
-              />
-            </label>
+            <div
+              className="inline-flex items-center rounded-[var(--radius-card)] bg-[var(--color-bg)] p-0.5 border border-black/5"
+              role="group"
+              aria-label="Filtruj po liczbie poparć"
+            >
+              <span className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium text-[var(--color-text)]/70 select-none">
+                <ThumbsUp size={12} className="text-[var(--color-ideas)]" />
+                <span className="hidden xl:inline">Lajki:</span>
+              </span>
+              {[
+                { label: 'Wszystkie', value: 0 },
+                { label: '3+', value: 3 },
+                { label: '5+', value: 5 },
+                { label: '10+', value: 10 },
+              ].map((opt) => {
+                const isActive =
+                  opt.value === 0 ? ideaFilters.minLikes === 0 : ideaFilters.minLikes === opt.value
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() =>
+                      onIdeaFiltersChange({
+                        ...ideaFilters,
+                        minLikes:
+                          opt.value === 0 ? 0 : ideaFilters.minLikes === opt.value ? 0 : opt.value,
+                      })
+                    }
+                    className={`min-h-7 px-2.5 py-0.5 rounded-md border-0 cursor-pointer font-medium text-xs transition-all ${
+                      isActive
+                        ? 'bg-white shadow-xs text-[var(--color-ideas)] font-bold'
+                        : 'bg-transparent text-[var(--color-text)]/65 hover:text-[var(--color-text)]'
+                    }`}
+                    aria-pressed={isActive}
+                    aria-label={opt.value === 0 ? 'Wszystkie pomysły' : `Minimum ${opt.value} poparć`}
+                    title={opt.value === 0 ? 'Wszystkie pomysły' : `Minimum ${opt.value} poparć`}
+                  >
+                    {opt.label}
+                  </button>
+                )
+              })}
+            </div>
           </div>
         )}
-
-        <div className="inline-flex items-center gap-1 text-xs text-[var(--color-text)]/70">
-          <Layers size={14} className="text-[var(--color-text)]/50" />
-          <select
-            value={wmsLayer}
-            onChange={(e) => onWmsLayerChange(e.target.value as WmsLayerId)}
-            className="min-h-8 px-2 py-0.5 rounded-md border border-black/10 bg-[var(--color-bg)] text-xs font-medium cursor-pointer"
-            aria-label="Warstwa WMS"
-          >
-            <option value="none">WMS: Brak (OSM)</option>
-            <option value="mpzp">WMS: MPZP Kraków</option>
-            <option value="ownership">WMS: Własność</option>
-          </select>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => setShowTopIdeas((prev) => !prev)}
-          className={`hidden md:inline-flex items-center gap-1.5 min-h-9 px-3 rounded-[var(--radius-card)] border border-black/10 text-xs font-medium cursor-pointer transition-colors ${
-            showTopIdeas
-              ? 'bg-white text-[var(--color-text)]/80 hover:bg-black/5'
-              : 'bg-white text-[var(--color-ideas)] shadow-xs hover:bg-black/5 font-semibold'
-          }`}
-          title={showTopIdeas ? hideButtonLabel : showButtonLabel}
-          aria-label={showTopIdeas ? 'Schowaj listę' : 'Pokaż listę'}
-        >
-          {showTopIdeas ? <PanelLeftClose size={14} /> : <PanelLeftOpen size={14} />}
-          <span>{showTopIdeas ? 'Schowaj listę' : 'Pokaż listę'}</span>
-        </button>
 
         <button
           type="button"
