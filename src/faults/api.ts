@@ -51,3 +51,12 @@ export const FAULT_STATUS_LABELS: Record<string, string> = {
   author_resolved: 'Autor zgłosił usunięcie',
   city_repair_sim: 'W naprawie przez miasto (symulacja)',
 }
+
+export const FAULT_CATEGORY_LABELS: Record<string, string> = {
+  street_furniture: 'Mała architektura',
+  waste: 'Odpady',
+  lighting: 'Oświetlenie',
+  pavement: 'Nawierzchnia',
+  other: 'Inne',
+}
+

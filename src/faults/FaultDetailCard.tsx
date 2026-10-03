@@ -1,17 +1,9 @@
 import { AlertTriangle, CheckCircle2, Clock, MapPin, X } from 'lucide-react'
 import { publicPhotoUrl } from '../lib/storage'
 import { copy } from '../ui/copy'
-import { FAULT_STATUS_LABELS } from './api'
+import { FAULT_CATEGORY_LABELS, FAULT_STATUS_LABELS } from './api'
 import type { FaultRecord } from './types'
 import type { DemoFault } from '../data/demoContent'
-
-export const FAULT_CATEGORY_LABELS: Record<string, string> = {
-  street_furniture: 'Mała architektura',
-  waste: 'Odpady',
-  lighting: 'Oświetlenie',
-  pavement: 'Nawierzchnia',
-  other: 'Inne',
-}
 
 type FaultDetailCardProps = {
   fault: FaultRecord | DemoFault
