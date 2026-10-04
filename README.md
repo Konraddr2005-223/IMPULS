@@ -76,6 +76,7 @@ Aplikacja przygotowuje **roboczą** treść projektu BO. Domyślnie: determinist
 
 - `docs/presentation.html` — 10 slajdów → Drukuj → PDF
 - `docs/presentation.md` — skrót narracji
+- `docs/demo-script-1min.md` — scenariusz filmiku 1 min (narracja + klikanie + prep SQL)
 - `docs/backup-demo.md` — checklista nagrania zapasowego
 - `specification of smartcity project.md` — pełny plan
 
