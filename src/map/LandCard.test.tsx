@@ -53,6 +53,7 @@ describe('LandCard', () => {
 
     expect(screen.getByText(/Scenariusz demonstracyjny/i)).toBeInTheDocument()
     expect(screen.getByText('Władanie Gminy Kraków')).toBeInTheDocument()
+    expect(screen.getByTestId('land-ownership-badge')).toHaveTextContent(/Teren gminny/i)
     expect(screen.getByText(/STARE MIASTO/i)).toBeInTheDocument()
     expect(screen.getByText(/ZP.1/i)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Zobacz uchwałę planu w BIP/i })).toHaveAttribute(
@@ -60,6 +61,61 @@ describe('LandCard', () => {
       'https://bip.krakow.pl/uchwala-demo',
     )
     expect(screen.getByText(copy.landDisclaimer)).toBeInTheDocument()
+  })
+
+  it('shows clear municipal status for live MSIP GK assessment', () => {
+    const liveMunicipal: LandAssessment = {
+      ...mockSyntheticAssessment,
+      mode: 'live',
+      ownershipRawLabel: 'Teren gminny — GK – Gmina Kraków',
+      planning: { planName: null, designation: null, resolutionUrl: null },
+      scenarioDescription:
+        'Teren gminny — GK – Gmina Kraków · Gmina Kraków - właściciel · Jednostka ewidencyjna: Śródmieście',
+    }
+
+    render(
+      <LandCard assessment={liveMunicipal} loading={false} error={null} onClose={vi.fn()} />,
+    )
+
+    expect(
+      screen.getByText(/Teren gminny — wstępnie bez wykrytej przeszkody/i),
+    ).toBeInTheDocument()
+    expect(screen.getByTestId('land-ownership-badge')).toHaveTextContent(/Teren gminny/i)
+    expect(screen.getByTestId('land-ownership-badge')).toHaveTextContent(/Gminy Miejskiej Kraków/i)
+    expect(screen.getAllByText(/Teren gminny — GK/i).length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('shows clear non-municipal mock for non-GK assessment', () => {
+    const nonMunicipal: LandAssessment = {
+      ...mockSyntheticAssessment,
+      mode: 'synthetic_demo',
+      ownershipClass: 'other_or_uncertain',
+      ownershipRawLabel: 'Teren nienależący do gminy',
+      assessment: 'requires_review',
+      planning: {
+        planName: 'KROWODRZA — Centrum',
+        designation: 'MW',
+        resolutionUrl: 'https://www.bip.krakow.pl/?dok_id=116191',
+      },
+      scenarioDescription:
+        'Teren nienależący do gminy · Osoba prawna · Jednostka ewidencyjna: Krowodrza',
+      warnings: [
+        copy.landDisclaimer,
+        'Lokalizacja projektu BO wymaga gruntu w dyspozycji Gminy Kraków — ten punkt tego nie spełnia.',
+      ],
+    }
+
+    render(
+      <LandCard assessment={nonMunicipal} loading={false} error={null} onClose={vi.fn()} />,
+    )
+
+    expect(screen.getAllByText(/Teren nienależący do gminy/i).length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByTestId('land-ownership-badge')).toHaveTextContent(
+      /Teren nienależący do gminy/i,
+    )
+    // Plan name + scenario both mention Krowodrza — assert with getAllByText
+    expect(screen.getAllByText(/KROWODRZA/i).length).toBeGreaterThanOrEqual(1)
+    expect(screen.queryByText(/Punkt może leżeć przy granicy/i)).not.toBeInTheDocument()
   })
 
   it('triggers onClose callback on button click', async () => {

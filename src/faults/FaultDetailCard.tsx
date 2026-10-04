@@ -77,7 +77,7 @@ export function FaultDetailCard({
 
   return (
     <aside
-      className="absolute left-3 right-3 md:left-auto md:right-4 md:w-[380px] bottom-4 z-10 rounded-[var(--radius-card)] bg-white border border-black/10 shadow-xl p-4 max-h-[85vh] overflow-y-auto flex flex-col gap-3"
+      className="absolute z-10 left-3 right-3 bottom-4 max-h-[70vh] md:inset-y-3 md:left-auto md:right-3 md:bottom-3 md:max-h-none md:w-[min(380px,calc(100%-1.5rem))] rounded-[var(--radius-card)] bg-white border border-black/10 shadow-xl p-4 overflow-y-auto flex flex-col gap-3"
       aria-label="Szczegóły usterki"
     >
       <div className="flex items-start justify-between gap-2">

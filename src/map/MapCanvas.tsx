@@ -12,6 +12,7 @@ import {
 } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { MergedPolygon } from '../areas/polygon'
+import type { IdeaIconKind } from '../ideas/ideaVisuals'
 import {
   KRAKOW_CENTER,
   KRAKOW_DEFAULT_ZOOM,
@@ -19,6 +20,7 @@ import {
   OSM_TILE_URL,
 } from './krakow'
 import { DistrictsLayer } from './DistrictsLayer'
+import { IdeaMapMarker } from './IdeaMapMarker'
 import { MunicipalLandLayer } from './MunicipalLandLayer'
 import { wmsSources } from '../city/krakow/config'
 
@@ -31,6 +33,8 @@ export type MapMarker = {
   sublabel?: string
   highlight?: boolean
   selected?: boolean
+  /** Category glyph for idea pins (tree, dog, bike…). */
+  iconKind?: IdeaIconKind
 }
 
 export type MapCircle = {
@@ -317,20 +321,31 @@ export function MapCanvas({
       })}
 
       {markers.map((marker) => {
-        const isIdea = marker.kind === 'idea'
-        const color = isIdea ? '#176B4B' : '#C45C26'
+        if (marker.kind === 'idea') {
+          return (
+            <IdeaMapMarker
+              key={marker.id}
+              marker={marker}
+              onClick={(m) => {
+                lastMarkerClickTimeRef.current = Date.now()
+                onMarkerClick?.(m)
+              }}
+            />
+          )
+        }
+
+        const color = '#C45C26'
         const radius = marker.selected ? 13 : marker.highlight ? 12 : 9
 
         return (
           <Fragment key={marker.id}>
             {marker.selected && (
               <>
-                {/* Outer animated radar pulse ring */}
                 <CircleMarker
                   center={[marker.lat, marker.lng]}
                   radius={24}
                   pathOptions={{
-                    color: color,
+                    color,
                     fillColor: color,
                     fillOpacity: 0.15,
                     weight: 2,
@@ -338,12 +353,11 @@ export function MapCanvas({
                     className: 'selected-marker-pulse',
                   }}
                 />
-                {/* Inner breathing glow ring */}
                 <CircleMarker
                   center={[marker.lat, marker.lng]}
                   radius={18}
                   pathOptions={{
-                    color: color,
+                    color,
                     fillColor: color,
                     fillOpacity: 0.25,
                     weight: 2.5,
@@ -374,9 +388,6 @@ export function MapCanvas({
                   <p className="m-0 font-semibold">{marker.label}</p>
                   {marker.sublabel && (
                     <p className="m-0 text-[10px] opacity-75">{marker.sublabel}</p>
-                  )}
-                  {marker.highlight && (
-                    <span className="text-[10px] text-amber-600 font-bold">★ Wyróżniony w okolicy</span>
                   )}
                 </div>
               </Tooltip>

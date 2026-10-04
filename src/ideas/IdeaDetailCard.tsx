@@ -5,6 +5,8 @@ import { addComment, fetchComments, type CommentRecord } from '../comments/api'
 import { publicPhotoUrl } from '../lib/storage'
 import { copy } from '../ui/copy'
 import { updateSupportThreshold } from './api'
+import { IdeaPhoto } from './IdeaPhoto'
+import { ideaVisualMeta } from './ideaVisuals'
 import type { IdeaRecord } from './types'
 
 type IdeaDetailCardProps = {
@@ -121,27 +123,34 @@ export function IdeaDetailCard({
   }
 
   const photoUrl = idea.photo_path ? publicPhotoUrl(idea.photo_path) : null
+  const visual = ideaVisualMeta(idea.title, idea.description)
 
   return (
     <aside
-      className="absolute left-3 right-3 md:left-auto md:right-4 md:w-[410px] bottom-4 z-10 rounded-[var(--radius-card)] bg-white border border-black/10 shadow-xl p-4 max-h-[85vh] overflow-y-auto flex flex-col gap-3"
+      className="absolute z-10 left-2 right-2 sm:left-3 sm:right-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-h-[min(70vh,560px)] md:inset-y-3 md:left-auto md:right-3 md:bottom-3 md:max-h-none md:w-[min(400px,calc(100%-1.5rem))] rounded-[var(--radius-card)] bg-white border border-[var(--color-outline)] shadow-[var(--shadow-card)] overflow-hidden flex flex-col ring-1 ring-black/5"
       aria-label="Szczegóły pomysłu"
     >
+      <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[var(--radius-card)] bg-[var(--color-primary)] z-[1]" />
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 sm:p-4 flex flex-col gap-3">
       {/* Header */}
-      <div className="flex items-start justify-between gap-2">
+      <div className="flex items-start justify-between gap-2 pt-1">
         <div>
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex flex-wrap items-center gap-2 mb-1">
             <span
-              className="px-2 py-0.5 text-xs font-semibold rounded-full text-white"
-              style={{ background: 'var(--color-ideas)' }}
+              className={`px-2.5 py-0.5 text-[11px] font-bold rounded-full ${visual.badgeClass}`}
             >
+              {visual.label}
+            </span>
+            <span className="px-2 py-0.5 text-[11px] font-semibold rounded-full bg-slate-100 text-slate-700">
               {idea.category === 'investment' ? 'Inwestycyjny' : 'Nieinwestycyjny'}
             </span>
-            <span className="text-xs text-[var(--color-text)]/60 font-medium">
+            <span className="text-xs text-[var(--color-text-muted)] font-medium">
               {idea.district_code ?? 'Kraków'}
             </span>
           </div>
-          <h2 className="m-0 text-base font-semibold text-[var(--color-text)]">{idea.title}</h2>
+          <h2 className="m-0 text-base font-bold tracking-tight text-[var(--color-text)]">
+            {idea.title}
+          </h2>
         </div>
         <button
           type="button"
@@ -153,16 +162,13 @@ export function IdeaDetailCard({
         </button>
       </div>
 
-      {photoUrl && (
-        <div className="rounded-lg overflow-hidden border border-black/5 max-h-48 bg-black/5">
-          <img
-            src={photoUrl}
-            alt={idea.title}
-            className="w-full h-full object-cover"
-            loading="lazy"
-          />
-        </div>
-      )}
+      <IdeaPhoto
+        title={idea.title}
+        description={idea.description}
+        photoPath={idea.photo_path}
+        publicUrl={photoUrl}
+        className="rounded-xl border border-[var(--color-outline)] max-h-48 aspect-[16/10]"
+      />
 
       {/* Description */}
       <p className="m-0 text-sm text-[var(--color-text)]/85 whitespace-pre-wrap leading-relaxed">
@@ -249,40 +255,6 @@ export function IdeaDetailCard({
           Karta terenu
         </button>
       </div>
-
-      {/* Primary: Asystent BO on map → formal draft + PDF. Classic prepare stays as backup. */}
-      {isAuthor && (
-        <div className="pt-1 space-y-2">
-          <button
-            type="button"
-            onClick={openAgent}
-            disabled={!reached}
-            className="w-full min-h-11 px-4 rounded-[var(--radius-card)] border-0 text-white text-sm font-medium cursor-pointer disabled:opacity-50 inline-flex items-center justify-center gap-2 shadow-md transition-all"
-            style={{ background: reached ? 'var(--color-ideas)' : '#6B7280' }}
-          >
-            <Sparkles size={16} />
-            {reached
-              ? 'Generuj wniosek BO (+ PDF)'
-              : `Wniosek odblokuje się przy ${idea.support_threshold} poparciach`}
-          </button>
-          {reached && (
-            <button
-              type="button"
-              onClick={openPrepare}
-              className="w-full min-h-10 px-3 rounded-[var(--radius-card)] border border-black/10 bg-white text-xs font-medium cursor-pointer"
-            >
-              Zapas: klasyczny zakres katalogu
-            </button>
-          )}
-          {!reached && (
-            <p className="mt-1 mb-0 text-[11px] text-center text-[var(--color-text)]/50">
-              Zbierz jeszcze{' '}
-              {Math.max(0, idea.support_threshold - idea.likes_count)} poparć,
-              aby odblokować generowanie wniosku.
-            </p>
-          )}
-        </div>
-      )}
 
       {/* Comments section */}
       <div className="pt-2 border-t border-black/5">
@@ -374,6 +346,43 @@ export function IdeaDetailCard({
       {error && (
         <div className="p-2 rounded-lg bg-red-50 text-xs text-red-700 border border-red-200">
           {error}
+        </div>
+      )}
+      </div>
+
+      {/* Sticky CTA: always visible at bottom of right sidebar on laptop */}
+      {isAuthor && (
+        <div className="shrink-0 border-t border-[var(--color-outline)] bg-white px-3 sm:px-4 py-3 space-y-2 shadow-[0_-4px_12px_rgba(15,23,42,0.06)]">
+          <button
+            type="button"
+            onClick={openAgent}
+            disabled={!reached}
+            className="w-full min-h-11 px-4 rounded-[var(--radius-card)] border-0 text-sm font-bold cursor-pointer disabled:opacity-50 inline-flex items-center justify-center gap-2 shadow-md transition-all"
+            style={{
+              background: reached ? 'var(--color-primary)' : '#6B7280',
+              color: reached ? 'var(--color-primary-ink)' : '#fff',
+            }}
+          >
+            <Sparkles size={16} />
+            {reached
+              ? 'Generuj wniosek BO (+ PDF)'
+              : `Wniosek od ${idea.support_threshold} poparć`}
+          </button>
+          {reached ? (
+            <button
+              type="button"
+              onClick={openPrepare}
+              className="w-full min-h-9 px-3 rounded-[var(--radius-card)] border border-black/10 bg-white text-xs font-medium cursor-pointer"
+            >
+              Zapas: klasyczny zakres katalogu
+            </button>
+          ) : (
+            <p className="m-0 text-[11px] text-center text-[var(--color-text-muted)]">
+              Zbierz jeszcze{' '}
+              {Math.max(0, idea.support_threshold - idea.likes_count)} poparć,
+              aby odblokować generowanie.
+            </p>
+          )}
         </div>
       )}
     </aside>

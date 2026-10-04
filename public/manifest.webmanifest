@@ -1,13 +1,19 @@
 {
-  "name": "Sąsiedzki",
-  "short_name": "Sąsiedzki",
+  "name": "IMPULS",
+  "short_name": "IMPULS",
   "description": "Pomysł z okolicy. Wspólne działanie.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#F7F8FA",
-  "theme_color": "#176B4B",
+  "theme_color": "#eab308",
   "lang": "pl",
   "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
     {
       "src": "/favicon.svg",
       "sizes": "any",

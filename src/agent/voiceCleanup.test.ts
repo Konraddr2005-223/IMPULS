@@ -40,7 +40,7 @@ describe('normalizeApplicationLocation', () => {
 describe('cleanupApplicationVoice', () => {
   it('strips meta voice and coordinates together', () => {
     const out = cleanupApplicationVoice(
-      'Autor zgłosił pomysł przy 50.06143, 19.93722 w aplikacji Sąsiedzki.',
+      'Autor zgłosił pomysł przy 50.06143, 19.93722 w aplikacji IMPULS.',
     )
     expect(out.toLowerCase()).not.toContain('autor')
     expect(out.toLowerCase()).not.toContain('sąsiedzki')

@@ -32,11 +32,11 @@ describe('MapCanvas', () => {
     const leafletEl = container.querySelector('.leaflet-container')
     expect(leafletEl).toBeInTheDocument()
 
-    const markerEl = container.querySelector('path.leaflet-interactive')
-    expect(markerEl).toBeInTheDocument()
+    const pin = container.querySelector('.idea-map-pin')
+    expect(pin).toBeInTheDocument()
   })
 
-  it('renders halo around selected marker', () => {
+  it('renders selected idea pin with selected class', () => {
     const markers: MapMarker[] = [
       {
         id: 'idea-selected',
@@ -45,6 +45,7 @@ describe('MapCanvas', () => {
         kind: 'idea',
         label: 'Wybrany pomysł',
         selected: true,
+        iconKind: 'tree',
       },
     ]
 
@@ -56,9 +57,8 @@ describe('MapCanvas', () => {
       />,
     )
 
-    // With selected: true, it renders animated pulse rings and center marker (3 CircleMarkers)
-    const paths = container.querySelectorAll('path.leaflet-interactive')
-    expect(paths.length).toBe(3)
+    const pin = container.querySelector('.idea-map-pin.is-selected')
+    expect(pin).toBeInTheDocument()
   })
 
   it('accepts centerPoint and renders without errors', () => {

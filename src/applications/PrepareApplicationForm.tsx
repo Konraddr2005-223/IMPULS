@@ -36,52 +36,59 @@ export function PrepareApplicationForm({
 
   return (
     <aside
-      className="absolute left-3 right-3 md:left-auto md:right-4 md:w-[400px] bottom-4 z-10 rounded-[var(--radius-card)] bg-white border border-black/10 shadow-lg p-4 max-h-[75svh] overflow-y-auto"
+      className="absolute z-10 left-2 right-2 sm:left-3 sm:right-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-h-[min(78svh,720px)] md:inset-y-3 md:left-auto md:right-3 md:bottom-3 md:max-h-none md:w-[min(400px,calc(100%-1.5rem))] rounded-[var(--radius-card)] bg-white border border-[var(--color-outline)] shadow-[var(--shadow-card)] overflow-hidden flex flex-col ring-1 ring-black/5"
       aria-label="Przygotuj wniosek"
     >
-      <h2 className="m-0 text-base font-semibold">Przygotuj wniosek — zakres i ilości</h2>
-      <p className="mt-1 mb-3 text-xs text-[var(--color-text)]/65">
-        Potwierdź pozycje z katalogu. Kwoty liczy backend/katalog — AI ich nie wymyśla.
-      </p>
+      <div className="shrink-0 border-b border-[var(--color-outline)] px-4 py-3">
+        <h2 className="m-0 text-base font-semibold">Przygotuj wniosek — zakres i ilości</h2>
+        <p className="mt-1 mb-0 text-xs text-[var(--color-text-muted)]">
+          Potwierdź pozycje z katalogu. Kwoty liczy backend/katalog — AI ich nie wymyśla.
+        </p>
+      </div>
 
-      <ul className="m-0 p-0 list-none space-y-2">
-        {catalog.items.map((item) => {
-          const qty = lines.find((l) => l.catalogId === item.id)?.quantity ?? 0
-          return (
-            <li key={item.id} className="flex items-center gap-2 text-sm">
-              <input
-                type="number"
-                min={0}
-                max={99}
-                value={qty}
-                onChange={(e) => setQty(item.id, Number(e.target.value) || 0)}
-                className="w-16 min-h-10 px-2 rounded-[var(--radius-card)] border border-black/10"
-                aria-label={`Ilość: ${item.label}`}
-              />
-              <span className="flex-1">
-                {item.label}
-                <span className="block text-xs text-[var(--color-text)]/55">
-                  {item.minPln}–{item.maxPln} zł / {item.unit}
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-3 space-y-3">
+        <ul className="m-0 p-0 list-none space-y-2">
+          {catalog.items.map((item) => {
+            const qty = lines.find((l) => l.catalogId === item.id)?.quantity ?? 0
+            return (
+              <li key={item.id} className="flex items-center gap-2 text-sm">
+                <input
+                  type="number"
+                  min={0}
+                  max={99}
+                  value={qty}
+                  onChange={(e) => setQty(item.id, Number(e.target.value) || 0)}
+                  className="w-16 min-h-10 px-2 rounded-[var(--radius-card)] border border-black/10"
+                  aria-label={`Ilość: ${item.label}`}
+                />
+                <span className="flex-1">
+                  {item.label}
+                  <span className="block text-xs text-[var(--color-text-muted)]">
+                    {item.minPln}–{item.maxPln} zł / {item.unit}
+                  </span>
                 </span>
-              </span>
-            </li>
-          )
-        })}
-      </ul>
+              </li>
+            )
+          })}
+        </ul>
 
-      <p className="mt-3 mb-1 text-sm font-medium">
-        Rozpoznane pozycje: {formatPlnRange(summary.totalMinPln, summary.totalMaxPln)}.
-      </p>
-      <p className="m-0 text-xs text-[var(--color-text)]/60">{summary.disclaimer}</p>
-      <p className="mt-1 mb-0 text-xs text-[var(--color-text)]/55">{catalog.taxNote}</p>
+        <p className="m-0 text-sm font-medium">
+          Rozpoznane pozycje: {formatPlnRange(summary.totalMinPln, summary.totalMaxPln)}.
+        </p>
+        <p className="m-0 text-xs text-[var(--color-text-muted)]">{summary.disclaimer}</p>
+        <p className="m-0 text-xs text-[var(--color-text-muted)]">{catalog.taxNote}</p>
+      </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="shrink-0 border-t border-[var(--color-outline)] bg-white px-4 py-3 flex flex-wrap gap-2 shadow-[0_-4px_12px_rgba(15,23,42,0.06)]">
         <button
           type="button"
           disabled={busy || lines.length === 0}
           onClick={() => onConfirm(lines)}
-          className="min-h-11 px-4 rounded-[var(--radius-card)] border-0 text-white text-sm font-medium cursor-pointer disabled:opacity-50"
-          style={{ background: 'var(--color-ideas)' }}
+          className="min-h-11 px-4 rounded-[var(--radius-card)] border-0 text-sm font-bold cursor-pointer disabled:opacity-50"
+          style={{
+            background: 'var(--color-primary)',
+            color: 'var(--color-primary-ink)',
+          }}
         >
           {busy ? 'Generuję…' : 'Generuj dokument'}
         </button>

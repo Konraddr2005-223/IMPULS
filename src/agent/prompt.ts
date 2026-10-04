@@ -3,7 +3,7 @@ import { costCatalog } from '../city/krakow/config'
 import { OFFICIAL_FORM_LABELS } from './schema'
 
 /**
- * Adapted from agent_prompt.md for Sąsiedzki.
+ * Adapted from agent_prompt.md for IMPULS.
  * Output mirrors official Kraków BO form (instrukcja 2026, budzet.krakow.pl).
  */
 export const AGENT_PROMPT_VERSION = 'sasiedzki-bo-agent-2026-v4'
@@ -14,7 +14,7 @@ Piszesz treść, którą wnioskodawca wklei do budzet.krakow.pl i złoży w imie
 GŁOS DOKUMENTU (krytyczne — naruszenie dyskwalifikuje odpowiedź):
 - Pisz jak GOTOWY WNIOSEK / PROPOZYCJA ZADANIA — nie jak komentarz asystenta.
 - Zakazane zwroty i styl: „autor wskazał”, „autor zgłosił”, „wskazane przez autora”,
-  „użytkownik napisał”, „zgodnie z pomysłem autora”, „w aplikacji Sąsiedzki”,
+  „użytkownik napisał”, „zgodnie z pomysłem autora”, „w aplikacji IMPULS”,
   „robocza treść”, „do sprawdzenia przez autora”, „uwagi sąsiadów wskazane przez autora”.
 - Dozwolony język urzędowy: „Proponujemy…”, „Celem zadania jest…”, „W okolicy brakuje…”,
   „Zakres obejmuje…”, „Efekty będą dostępne…”.
@@ -97,7 +97,7 @@ export function buildCityRulesContext(): string {
     `Uwagi szablonu: ${template.notes.join(' ')}`,
     `Oficjalny formularz: ${submit.officialFormUrl}`,
     `Lista poparcia (info): ${submit.signatureListUrl}`,
-    `MSIP / własność: grunty Gminy Miejskiej Kraków (warstwa GK w Sąsiedzkim lub MSIP).`,
+    `MSIP / własność: grunty Gminy Miejskiej Kraków (warstwa GK w IMPULS lub MSIP).`,
     `Regulamin BO 2026 (§17): nie na gruntach nienależących / niepozostających we władaniu Miasta;`,
     `wykluczone m.in. UW, najem, dzierżawa; działki prywatne / spółdzielcze / PKP — nie.`,
     `Katalog pozycji (tylko id):`,
