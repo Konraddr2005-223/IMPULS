@@ -1,4 +1,4 @@
-/** Urban Civic Pulse tokens (stitch) adapted for Sąsiedzki / Kraków BO. */
+/** Urban Civic Pulse tokens (stitch) adapted for IMPULS / Kraków BO. */
 export const colors = {
   background: '#f8f9ff',
   surface: '#ffffff',
@@ -25,6 +25,6 @@ export const radii = {
 } as const
 
 export const brand = {
-  name: 'Sąsiedzki',
+  name: 'IMPULS',
   tagline: 'Pomysł z okolicy. Wspólne działanie.',
 } as const

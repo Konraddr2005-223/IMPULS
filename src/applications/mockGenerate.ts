@@ -49,7 +49,7 @@ export function mockGenerateApplication(input: GenerateInput): ApplicationConten
     justification:
       projectType === 'non_investment'
         ? 'Propozycja nieinwestycyjna odpowiada na lokalną potrzebę mieszkańców i nie wymaga trwałej zabudowy. Wymaga potwierdzenia warunków realizacji przez miasto.'
-        : 'Propozycja odpowiada na lokalną potrzebę użytkowników aplikacji Sąsiedzki i ma charakter ogólnodostępny. Wymaga potwierdzenia warunków realizacji przez miasto.',
+        : 'Propozycja odpowiada na lokalną potrzebę użytkowników aplikacji IMPULS i ma charakter ogólnodostępny. Wymaga potwierdzenia warunków realizacji przez miasto.',
     accessibility:
       'Zakres dotyczy przestrzeni ogólnodostępnej. Szczegóły dostępności wymagać będą weryfikacji w terenie.',
     schedule:

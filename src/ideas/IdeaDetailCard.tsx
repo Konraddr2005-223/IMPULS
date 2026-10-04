@@ -127,10 +127,11 @@ export function IdeaDetailCard({
 
   return (
     <aside
-      className="absolute left-3 right-3 md:left-auto md:right-4 md:w-[410px] bottom-4 z-10 rounded-[var(--radius-card)] bg-white border border-[var(--color-outline)] shadow-[var(--shadow-card)] p-4 max-h-[85vh] overflow-y-auto flex flex-col gap-3 ring-1 ring-black/5"
+      className="absolute z-10 left-2 right-2 sm:left-3 sm:right-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-h-[min(70vh,560px)] md:inset-y-3 md:left-auto md:right-3 md:bottom-3 md:max-h-none md:w-[min(400px,calc(100%-1.5rem))] rounded-[var(--radius-card)] bg-white border border-[var(--color-outline)] shadow-[var(--shadow-card)] overflow-hidden flex flex-col ring-1 ring-black/5"
       aria-label="Szczegóły pomysłu"
     >
-      <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[var(--radius-card)] bg-[var(--color-primary)]" />
+      <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[var(--radius-card)] bg-[var(--color-primary)] z-[1]" />
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-3 sm:p-4 flex flex-col gap-3">
       {/* Header */}
       <div className="flex items-start justify-between gap-2 pt-1">
         <div>
@@ -255,40 +256,6 @@ export function IdeaDetailCard({
         </button>
       </div>
 
-      {/* Primary: Asystent BO on map → formal draft + PDF. Classic prepare stays as backup. */}
-      {isAuthor && (
-        <div className="pt-1 space-y-2">
-          <button
-            type="button"
-            onClick={openAgent}
-            disabled={!reached}
-            className="w-full min-h-11 px-4 rounded-[var(--radius-card)] border-0 text-white text-sm font-medium cursor-pointer disabled:opacity-50 inline-flex items-center justify-center gap-2 shadow-md transition-all"
-            style={{ background: reached ? 'var(--color-ideas)' : '#6B7280' }}
-          >
-            <Sparkles size={16} />
-            {reached
-              ? 'Generuj wniosek BO (+ PDF)'
-              : `Wniosek odblokuje się przy ${idea.support_threshold} poparciach`}
-          </button>
-          {reached && (
-            <button
-              type="button"
-              onClick={openPrepare}
-              className="w-full min-h-10 px-3 rounded-[var(--radius-card)] border border-black/10 bg-white text-xs font-medium cursor-pointer"
-            >
-              Zapas: klasyczny zakres katalogu
-            </button>
-          )}
-          {!reached && (
-            <p className="mt-1 mb-0 text-[11px] text-center text-[var(--color-text)]/50">
-              Zbierz jeszcze{' '}
-              {Math.max(0, idea.support_threshold - idea.likes_count)} poparć,
-              aby odblokować generowanie wniosku.
-            </p>
-          )}
-        </div>
-      )}
-
       {/* Comments section */}
       <div className="pt-2 border-t border-black/5">
         <h3 className="m-0 mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--color-text)]/70 flex items-center justify-between">
@@ -379,6 +346,43 @@ export function IdeaDetailCard({
       {error && (
         <div className="p-2 rounded-lg bg-red-50 text-xs text-red-700 border border-red-200">
           {error}
+        </div>
+      )}
+      </div>
+
+      {/* Sticky CTA: always visible at bottom of right sidebar on laptop */}
+      {isAuthor && (
+        <div className="shrink-0 border-t border-[var(--color-outline)] bg-white px-3 sm:px-4 py-3 space-y-2 shadow-[0_-4px_12px_rgba(15,23,42,0.06)]">
+          <button
+            type="button"
+            onClick={openAgent}
+            disabled={!reached}
+            className="w-full min-h-11 px-4 rounded-[var(--radius-card)] border-0 text-sm font-bold cursor-pointer disabled:opacity-50 inline-flex items-center justify-center gap-2 shadow-md transition-all"
+            style={{
+              background: reached ? 'var(--color-primary)' : '#6B7280',
+              color: reached ? 'var(--color-primary-ink)' : '#fff',
+            }}
+          >
+            <Sparkles size={16} />
+            {reached
+              ? 'Generuj wniosek BO (+ PDF)'
+              : `Wniosek od ${idea.support_threshold} poparć`}
+          </button>
+          {reached ? (
+            <button
+              type="button"
+              onClick={openPrepare}
+              className="w-full min-h-9 px-3 rounded-[var(--radius-card)] border border-black/10 bg-white text-xs font-medium cursor-pointer"
+            >
+              Zapas: klasyczny zakres katalogu
+            </button>
+          ) : (
+            <p className="m-0 text-[11px] text-center text-[var(--color-text-muted)]">
+              Zbierz jeszcze{' '}
+              {Math.max(0, idea.support_threshold - idea.likes_count)} poparć,
+              aby odblokować generowanie.
+            </p>
+          )}
         </div>
       )}
     </aside>

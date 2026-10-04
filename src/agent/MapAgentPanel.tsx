@@ -44,18 +44,18 @@ export function MapAgentPanel({
     })
       .then((result) => {
         if (cancelled) return
-        const proposal = result.proposal
+        const next = result.proposal
         // Terrain note is UI/context only — never GPS, never mixed into location.
         if (landNote?.trim()) {
           const note = landNote.trim()
-          if (!proposal.warnings.some((w) => w.includes(note))) {
-            proposal.warnings = [
-              ...proposal.warnings,
+          if (!next.warnings.some((w) => w.includes(note))) {
+            next.warnings = [
+              ...next.warnings,
               `Weryfikacja terenu (MSIP): ${note}`,
             ]
           }
         }
-        setProposal(proposal)
+        setProposal(next)
         setMode(result.mode)
       })
       .catch((err: unknown) => {
@@ -75,15 +75,15 @@ export function MapAgentPanel({
 
   return (
     <aside
-      className="absolute left-3 right-3 md:left-auto md:right-4 md:w-[420px] bottom-4 z-10 rounded-[var(--radius-card)] bg-white border border-black/10 shadow-lg max-h-[78svh] overflow-y-auto"
-      aria-label="Asystent BO na mapie"
+      className="absolute z-10 left-2 right-2 sm:left-3 sm:right-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] max-h-[min(78svh,720px)] md:inset-y-3 md:left-auto md:right-3 md:bottom-3 md:max-h-none md:w-[min(420px,calc(100%-1.5rem))] rounded-[var(--radius-card)] bg-white border border-[var(--color-outline)] shadow-[var(--shadow-card)] overflow-hidden flex flex-col ring-1 ring-black/5"
+      aria-label="Wniosek BO na mapie"
     >
-      <div className="sticky top-0 z-[1] bg-white/95 backdrop-blur border-b border-black/5 px-4 py-3 flex items-start justify-between gap-2">
+      <div className="shrink-0 bg-white/95 backdrop-blur border-b border-[var(--color-outline)] px-4 py-3 flex items-start justify-between gap-2">
         <div>
           <h2 className="m-0 text-base font-semibold inline-flex items-center gap-2">
             <Bot size={18} aria-hidden /> Wniosek BO
           </h2>
-          <p className="m-0 mt-1 text-xs text-[var(--color-text)]/65">
+          <p className="m-0 mt-1 text-xs text-[var(--color-text-muted)]">
             Generowanie z pomysłu na mapie · {copy.documentDisclaimer}
           </p>
         </div>
@@ -97,13 +97,13 @@ export function MapAgentPanel({
         </button>
       </div>
 
-      <div className="p-4 space-y-3">
+      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-3">
         <p className="m-0 text-sm">
           <span className="font-medium">Pomysł:</span> {idea.title}
         </p>
 
         {busy && (
-          <p className="m-0 text-sm text-[var(--color-text)]/70 inline-flex items-center gap-2">
+          <p className="m-0 text-sm text-[var(--color-text-muted)] inline-flex items-center gap-2">
             <Sparkles size={16} className="animate-pulse" />
             Przygotowuję formalny wniosek…
           </p>
@@ -122,7 +122,9 @@ export function MapAgentPanel({
             compact
           />
         )}
+      </div>
 
+      <div className="shrink-0 border-t border-[var(--color-outline)] bg-white px-4 py-3 shadow-[0_-4px_12px_rgba(15,23,42,0.06)]">
         <button
           type="button"
           onClick={onOpenClassicPrepare}

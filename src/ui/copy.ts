@@ -6,7 +6,7 @@ export const copy = {
   landDisclaimer:
     'Informacja poglądowa. Ostateczną możliwość realizacji ocenia miasto.',
   faultDisclaimer:
-    'Zapisano w Sąsiedzkim. Zgłoszenie nie zostało przekazane do urzędu.',
+    'Zapisano w IMPULS. Zgłoszenie nie zostało przekazane do urzędu.',
   landError:
     'Nie udało się sprawdzić terenu. Możesz zapisać pomysł i wrócić do weryfikacji.',
   gpsDenied: 'Brak dostępu do GPS — wskaż punkt ręcznie na mapie.',

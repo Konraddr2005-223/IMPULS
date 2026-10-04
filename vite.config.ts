@@ -11,17 +11,23 @@ export default defineConfig({
     boAgentApiPlugin(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'data/krakow-demo-locations.geojson'],
+      includeAssets: ['favicon.svg', 'logo.png', 'data/krakow-demo-locations.geojson'],
       manifest: {
-        name: 'Sąsiedzki',
-        short_name: 'Sąsiedzki',
+        name: 'IMPULS',
+        short_name: 'IMPULS',
         description: 'Pomysł z okolicy. Wspólne działanie.',
-        theme_color: '#176B4B',
+        theme_color: '#eab308',
         background_color: '#F7F8FA',
         display: 'standalone',
         lang: 'pl',
         start_url: '/',
         icons: [
+          {
+            src: '/logo.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any',
+          },
           {
             src: '/favicon.svg',
             sizes: 'any',
@@ -32,7 +38,7 @@ export default defineConfig({
       },
       workbox: {
         navigateFallback: '/index.html',
-        globPatterns: ['**/*.{js,css,html,svg,ico,webp,woff2}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,webp,woff2}'],
       },
     }),
   ],

@@ -143,7 +143,7 @@ export const submissionInstructions: SubmissionInstructions = {
   signatureListUrl:
     'https://budzet.krakow.pl/polecamy/309228,1910,komunikat,listy_poparcia.html',
   steps: [
-    'Przygotuj treść projektu w Sąsiedzkim i sprawdź ją przed kopiowaniem.',
+    'Przygotuj treść projektu w IMPULS i sprawdź ją przed kopiowaniem.',
     'Złóż projekt w oficjalnym systemie Budżetu Obywatelskiego Miasta Krakowa.',
     'W ciągu 10 dni dostarcz listę poparcia zgodnie z instrukcją miasta.',
     'Lajki w aplikacji nie są podpisami ani głosami.',

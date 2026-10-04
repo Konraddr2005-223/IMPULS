@@ -158,7 +158,7 @@ function buildProposalPdfDoc(proposal: BoAgentProposal): PdfDoc {
       margin: [0, 0, 0, 6],
     },
     {
-      text: 'Przygotowano w aplikacji Sąsiedzki. To nie jest złożenie w systemie miasta (budzet.krakow.pl).',
+      text: 'Przygotowano w aplikacji IMPULS. To nie jest złożenie w systemie miasta (budzet.krakow.pl).',
       style: 'banner',
       margin: [0, 0, 0, 12],
     },

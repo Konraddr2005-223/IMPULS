@@ -16,7 +16,7 @@ const assessmentConfig: Record<
   { label: string; bg: string; text: string; icon: typeof CheckCircle2 }
 > = {
   likely_suitable: {
-    label: 'Wstępnie bez wykrytej przeszkody (demo)',
+    label: 'Wstępnie bez wykrytej przeszkody',
     bg: '#EAF7EE',
     text: '#176B4B',
     icon: CheckCircle2,
@@ -41,6 +41,48 @@ const assessmentConfig: Record<
   },
 }
 
+const ownershipConfig: Record<
+  LandAssessment['ownershipClass'],
+  { label: string; bg: string; text: string; detail: string }
+> = {
+  municipal: {
+    label: 'Teren gminny',
+    bg: '#E8EEF9',
+    text: '#142D6E',
+    detail:
+      'Działka we władaniu Gminy Miejskiej Kraków (GK). Warstwa MSIP wskazuje grunt miejski — typowy warunek lokalizacji projektu BO.',
+  },
+  other_or_uncertain: {
+    label: 'Teren nienależący do gminy',
+    bg: '#FFF7ED',
+    text: '#9A3412',
+    detail:
+      'Wskazany punkt nie leży na czystym gruncie Gminy Kraków (GK). Projekty BO lokalizuje się zwykle na terenach gminnych — tu wymagana jest inna lokalizacja lub formalna weryfikacja.',
+  },
+  unknown: {
+    label: 'Władanie nieustalone',
+    bg: '#F3F4F6',
+    text: '#4B5563',
+    detail: 'Brak jednoznacznej informacji o władaniu dla wskazanego punktu.',
+  },
+}
+
+function statusLabel(
+  assessment: LandAssessment,
+  config: (typeof assessmentConfig)[LandAssessment['assessment']],
+): string {
+  if (assessment.ownershipClass === 'other_or_uncertain') {
+    return 'Teren nienależący do gminy'
+  }
+  if (assessment.mode === 'synthetic_demo' && assessment.assessment === 'likely_suitable') {
+    return 'Wstępnie bez wykrytej przeszkody (demo)'
+  }
+  if (assessment.ownershipClass === 'municipal' && assessment.assessment === 'likely_suitable') {
+    return 'Teren gminny — wstępnie bez wykrytej przeszkody'
+  }
+  return config.label
+}
+
 export function LandCard({
   assessment,
   loading,
@@ -53,10 +95,11 @@ export function LandCard({
 
   const config = assessment ? assessmentConfig[assessment.assessment] : null
   const StatusIcon = config?.icon ?? Info
+  const ownership = assessment ? ownershipConfig[assessment.ownershipClass] : null
 
   return (
     <aside
-      className="absolute left-3 right-3 md:left-auto md:right-4 md:w-[380px] bottom-4 z-10 rounded-[var(--radius-card)] bg-white border border-black/10 shadow-xl p-4 max-h-[85vh] overflow-y-auto flex flex-col gap-3"
+      className="absolute z-10 left-3 right-3 bottom-4 max-h-[70vh] md:inset-y-3 md:left-auto md:right-3 md:bottom-3 md:max-h-none md:w-[min(380px,calc(100%-1.5rem))] rounded-[var(--radius-card)] bg-white border border-black/10 shadow-xl p-4 overflow-y-auto flex flex-col gap-3"
       aria-live="polite"
       aria-label="Karta terenu"
     >
@@ -100,7 +143,23 @@ export function LandCard({
               style={{ background: config.bg, color: config.text }}
             >
               <StatusIcon size={16} className="shrink-0" />
-              <span>{config.label}</span>
+              <span>{statusLabel(assessment, config)}</span>
+            </div>
+          )}
+
+          {/* Ownership class — clear municipal / other signal */}
+          {ownership && (
+            <div
+              className="rounded-lg p-2.5 text-xs border"
+              style={{
+                background: ownership.bg,
+                color: ownership.text,
+                borderColor: `${ownership.text}22`,
+              }}
+              data-testid="land-ownership-badge"
+            >
+              <p className="m-0 font-semibold">{ownership.label}</p>
+              <p className="m-0 mt-1 leading-snug opacity-90">{ownership.detail}</p>
             </div>
           )}
 
@@ -174,7 +233,8 @@ export function LandCard({
             </p>
           )}
 
-          {assessment.assessment === 'requires_review' && (
+          {assessment.assessment === 'requires_review' &&
+            assessment.ownershipClass !== 'other_or_uncertain' && (
             <p className="m-0 text-xs text-[var(--color-text)]/60">
               Punkt może leżeć przy granicy działki — wynik wymaga weryfikacji.
             </p>

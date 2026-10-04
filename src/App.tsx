@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
-import { PanelLeftClose, PanelLeftOpen, Plus, ThumbsUp, Zap } from 'lucide-react'
+import { PanelLeftClose, PanelLeftOpen, Plus, ThumbsUp } from 'lucide-react'
 import { MapAgentPanel } from './agent/MapAgentPanel'
 import { IdeaListCard } from './ideas/IdeaListCard'
 import { resolveIdeaIconKind } from './ideas/ideaVisuals'
@@ -260,11 +260,17 @@ function App() {
               <button
                 type="button"
                 onClick={handleLogoClick}
-                className="border-0 bg-transparent p-0 cursor-pointer font-semibold text-xl text-left hover:opacity-85 transition-opacity"
-                style={{ color: 'var(--color-ideas)' }}
+                className="border-0 bg-transparent p-0 cursor-pointer font-semibold text-xl text-left hover:opacity-85 transition-opacity inline-flex items-center gap-2"
                 title="Wróć do mapy"
               >
-                {brand.name}
+                <img
+                  src="/logo.png"
+                  alt=""
+                  width={36}
+                  height={36}
+                  className="w-9 h-9 rounded-xl object-cover shadow-sm"
+                />
+                <span style={{ color: 'var(--color-ideas)' }}>{brand.name}</span>
               </button>
             </h1>
             <AuthBar />
@@ -280,19 +286,21 @@ function App() {
   }
 
   return (
-    <div className="min-h-svh flex flex-col">
+    <div className="h-svh max-h-svh flex flex-col overflow-hidden">
       <header className="shrink-0 px-4 py-3 border-b border-[var(--color-outline)] bg-white z-20 shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
         <div className="mx-auto max-w-6xl flex items-center justify-between gap-3">
           <div
             className="min-w-0 cursor-pointer group flex items-center gap-2.5"
             onClick={handleLogoClick}
           >
-            <span
-              className="w-10 h-10 rounded-xl bg-[var(--color-primary)] text-[var(--color-primary-ink)] inline-flex items-center justify-center shadow-sm shrink-0"
+            <img
+              src="/logo.png"
+              alt=""
+              width={40}
+              height={40}
+              className="w-10 h-10 rounded-xl object-cover shadow-sm shrink-0 ring-1 ring-black/5"
               aria-hidden
-            >
-              <Zap size={20} strokeWidth={2.5} />
-            </span>
+            />
             <div className="min-w-0">
               <h1 className="text-xl font-extrabold m-0 tracking-tight">
                 <button
@@ -322,10 +330,10 @@ function App() {
                   setAddKind(layer === 'usterki' ? 'fault' : 'idea')
                   setTab('dodaj')
                 }}
-                className="btn-civic-primary hidden sm:inline-flex items-center gap-1.5 h-10 px-3 cursor-pointer"
+                className="btn-civic-primary inline-flex items-center gap-1 h-9 sm:h-10 px-2.5 sm:px-3 cursor-pointer text-xs sm:text-sm"
               >
                 <Plus size={16} />
-                Zgłoś
+                <span className="hidden xs:inline sm:inline">Zgłoś</span>
               </button>
             )}
           </div>
@@ -987,13 +995,19 @@ function MapScreen({
         </span>
       </p>
 
-      <div className={`flex-1 min-h-0 grid ${showTopIdeas ? 'md:grid-cols-[minmax(280px,360px)_1fr]' : 'grid-cols-1'}`}>
+      <div
+        className={`flex-1 min-h-0 grid ${
+          showTopIdeas
+            ? 'grid-rows-[minmax(200px,38svh)_minmax(0,1fr)] md:grid-rows-[minmax(0,1fr)] md:grid-cols-[minmax(260px,min(38vw,420px))_minmax(0,1fr)]'
+            : 'grid-cols-1 grid-rows-[minmax(0,1fr)]'
+        }`}
+      >
         {showTopIdeas && (
           <aside
-            className="hidden md:flex flex-col min-h-0 border-r border-[var(--color-outline)] bg-[var(--color-bg)] overflow-y-auto"
+            className="flex flex-col min-h-0 border-b md:border-b-0 md:border-r border-[var(--color-outline)] bg-[var(--color-bg)] overflow-y-auto overscroll-contain"
             aria-label={layer === 'pomysly' ? 'Lista pomysłów' : 'Lista usterek'}
           >
-            <div className="shrink-0 px-3.5 py-2.5 border-b border-[var(--color-outline)] bg-white flex items-center justify-between gap-2 sticky top-0 z-10">
+            <div className="shrink-0 px-3 sm:px-3.5 py-2.5 border-b border-[var(--color-outline)] bg-white flex items-center justify-between gap-2 sticky top-0 z-10">
               <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--color-text)]">
                 <span>{listTitle}</span>
                 <span className="text-[11px] font-normal text-[var(--color-text)]/50">
@@ -1012,7 +1026,7 @@ function MapScreen({
               </button>
             </div>
             {layer === 'pomysly' ? (
-            <ul className="m-0 p-0 list-none divide-y divide-black/5">
+            <ul className="m-0 p-0 list-none py-2">
               {ideas ? (
                 ideas.length === 0 ? (
                   <li className="px-4 py-8 text-center text-sm text-[var(--color-text)]/60">
@@ -1133,14 +1147,14 @@ function MapScreen({
       )}
 
       <section
-        className="relative flex-1 min-h-[50svh] md:min-h-0"
+        className="relative h-full min-h-[42svh] md:min-h-0 overflow-hidden"
         aria-label="Mapa okolicy"
       >
         {!showTopIdeas && (
           <button
             type="button"
             onClick={() => setShowTopIdeas(true)}
-            className="hidden md:inline-flex absolute top-3 left-14 z-10 items-center gap-1.5 px-3 py-2 rounded-[var(--radius-card)] bg-white/95 backdrop-blur-xs border border-black/10 shadow-md text-xs font-semibold text-[var(--color-text)] hover:bg-white cursor-pointer transition-all hover:shadow-lg"
+            className="inline-flex absolute top-3 left-3 md:left-14 z-10 items-center gap-1.5 px-3 py-2 rounded-[var(--radius-card)] bg-white/95 backdrop-blur-xs border border-black/10 shadow-md text-xs font-semibold text-[var(--color-text)] hover:bg-white cursor-pointer transition-all hover:shadow-lg"
             title={showButtonLabel}
             aria-label={showButtonLabel}
           >
@@ -1201,7 +1215,7 @@ function MapScreen({
               />
               {generateError && (
                 <p
-                  className="absolute left-3 right-3 md:left-auto md:right-4 md:w-[400px] bottom-[calc(4rem+40vh)] z-20 m-0 p-2 rounded-[var(--radius-card)] bg-white border text-sm"
+                  className="absolute left-2 right-2 sm:left-3 sm:right-3 bottom-[max(5.5rem,env(safe-area-inset-bottom))] md:left-auto md:right-3 md:top-3 md:bottom-auto md:w-[min(400px,calc(100%-1.5rem))] z-20 m-0 p-2 rounded-[var(--radius-card)] bg-white border text-sm shadow-md"
                   style={{ color: 'var(--color-faults)' }}
                 >
                   {generateError}

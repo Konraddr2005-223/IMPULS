@@ -13,7 +13,7 @@ describe('design tokens', () => {
   })
 
   it('exposes the product brand and tagline', () => {
-    expect(brand.name).toBe('Sąsiedzki')
+    expect(brand.name).toBe('IMPULS')
     expect(brand.tagline).toBe('Pomysł z okolicy. Wspólne działanie.')
   })
 })

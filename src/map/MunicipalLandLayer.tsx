@@ -57,6 +57,28 @@ export type MunicipalExportBounds = {
 }
 
 /**
+ * Clamp export pixels into [min, max] while preserving aspect ratio.
+ * Independent width/height clamps distort the image and make GK parcels
+ * drift relative to the OSM basemap.
+ */
+export function clampExportSize(
+  width: number,
+  height: number,
+  min = 256,
+  max = 1280,
+): { width: number; height: number } {
+  let w = Math.max(1, width)
+  let h = Math.max(1, height)
+  const scaleUp = Math.max(min / w, min / h, 1)
+  w *= scaleUp
+  h *= scaleUp
+  const scaleDown = Math.min(max / w, max / h, 1)
+  w *= scaleDown
+  h *= scaleDown
+  return { width: Math.round(w), height: Math.round(h) }
+}
+
+/**
  * Pure ArcGIS export URL for a WGS84 viewport → Web Mercator image.
  * Kept free of map instance so unit tests can lock CRS/filter params.
  */
@@ -64,8 +86,7 @@ export function buildMunicipalExportUrl(
   view: MunicipalExportBounds,
   size: { width: number; height: number },
 ): OverlayState {
-  const width = Math.max(256, Math.min(Math.round(size.width), 1280))
-  const height = Math.max(256, Math.min(Math.round(size.height), 1280))
+  const { width, height } = clampExportSize(size.width, size.height)
 
   const sw = L.CRS.EPSG3857.project(L.latLng(view.south, view.west))
   const ne = L.CRS.EPSG3857.project(L.latLng(view.north, view.east))
@@ -94,25 +115,26 @@ export function buildMunicipalExportUrl(
 
 /**
  * Build an ArcGIS export that matches Leaflet's Web Mercator view.
- * imageSR/bboxSR 3857 + pixel size from projected bounds keeps parcels
- * glued to the basemap while panning (4326 exports drift).
+ * Pad in container pixels (not lat/lng degrees) so bbox aspect matches
+ * the export size and parcels stay glued while panning.
  */
 function buildOverlayRequest(map: L.Map): OverlayState {
-  const bounds = map.getBounds().pad(0.06)
-  const zoom = map.getZoom()
-  const topLeft = map.project(bounds.getNorthWest(), zoom)
-  const bottomRight = map.project(bounds.getSouthEast(), zoom)
+  const mapSize = map.getSize()
+  const padX = mapSize.x * 0.06
+  const padY = mapSize.y * 0.06
+  const sw = map.containerPointToLatLng(L.point(-padX, mapSize.y + padY))
+  const ne = map.containerPointToLatLng(L.point(mapSize.x + padX, -padY))
 
   return buildMunicipalExportUrl(
     {
-      west: bounds.getWest(),
-      south: bounds.getSouth(),
-      east: bounds.getEast(),
-      north: bounds.getNorth(),
+      west: sw.lng,
+      south: sw.lat,
+      east: ne.lng,
+      north: ne.lat,
     },
     {
-      width: bottomRight.x - topLeft.x,
-      height: bottomRight.y - topLeft.y,
+      width: mapSize.x + padX * 2,
+      height: mapSize.y + padY * 2,
     },
   )
 }
@@ -164,10 +186,12 @@ export function MunicipalLandLayer() {
 
   return (
     <ImageOverlay
+      key={overlay.url}
       url={overlay.url}
       bounds={overlay.bounds}
       opacity={0.85}
       zIndex={350}
+      interactive={false}
       attribution="&copy; MSIP Kraków — grunty Gminy Kraków (GK)"
     />
   )

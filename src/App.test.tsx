@@ -122,7 +122,7 @@ function renderApp() {
 describe('App shell', () => {
   it('renders brand, navigation and layer tabs', async () => {
     renderApp()
-    expect(screen.getByRole('heading', { name: 'Sąsiedzki' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'IMPULS' })).toBeInTheDocument()
     const nav = screen.getByRole('navigation', { name: 'Nawigacja dolna' })
     expect(within(nav).getByText('Mapa')).toBeInTheDocument()
     expect(within(nav).queryByText('Dodaj')).not.toBeInTheDocument()
@@ -164,7 +164,7 @@ describe('App shell', () => {
     await user.click(screen.getByRole('button', { name: '+ Dodaj' }))
     expect(screen.getByRole('heading', { name: 'Dodaj pomysł' })).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Sąsiedzki' }))
+    await user.click(screen.getByRole('button', { name: 'IMPULS' }))
     expect(screen.getByTestId('map-canvas')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Dodaj pomysł' })).not.toBeInTheDocument()
   })
@@ -182,11 +182,14 @@ describe('App shell', () => {
     renderApp()
     expect(await screen.findByText(/Pomysły: db/i)).toBeInTheDocument()
     const cards = screen.getAllByTestId('idea-list-card')
-    const ideaButton = cards.find((el) =>
+    const ideaCard = cards.find((el) =>
       /Zielony zakątek z ławkami/i.test(el.textContent ?? ''),
     )
-    expect(ideaButton).toBeTruthy()
-    await user.click(ideaButton!)
+    expect(ideaCard).toBeTruthy()
+    // Click the selectable card body (heading), not the "Szczegóły" toggle.
+    await user.click(
+      within(ideaCard!).getByRole('heading', { name: /Zielony zakątek z ławkami/i }),
+    )
     await waitFor(
       () => {
         expect(screen.getByTestId('map-center-point').textContent).toMatch(/^50\.07/)

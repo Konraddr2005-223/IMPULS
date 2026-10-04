@@ -3,6 +3,7 @@ import {
   MUNICIPAL_LAND_EXPORT_URL,
   MUNICIPAL_OWNERSHIP_WHERE,
   buildMunicipalExportUrl,
+  clampExportSize,
 } from './MunicipalLandLayer'
 
 describe('MunicipalLandLayer export', () => {
@@ -54,17 +55,16 @@ describe('MunicipalLandLayer export', () => {
     ])
   })
 
-  it('clamps export pixel size into 256..1280', () => {
-    const tiny = buildMunicipalExportUrl(
-      { west: 19.94, south: 50.05, east: 19.95, north: 50.06 },
-      { width: 10, height: 10 },
-    )
-    expect(new URL(tiny.url).searchParams.get('size')).toBe('256,256')
+  it('clamps export pixel size into 256..1280 while preserving aspect ratio', () => {
+    expect(clampExportSize(10, 10)).toEqual({ width: 256, height: 256 })
+    // 4000×3000 → scale by 1280/4000 so width hits max; height stays proportional
+    expect(clampExportSize(4000, 3000)).toEqual({ width: 1280, height: 960 })
+    expect(clampExportSize(800, 600)).toEqual({ width: 800, height: 600 })
 
     const huge = buildMunicipalExportUrl(
       { west: 19.94, south: 50.05, east: 19.95, north: 50.06 },
       { width: 4000, height: 3000 },
     )
-    expect(new URL(huge.url).searchParams.get('size')).toBe('1280,1280')
+    expect(new URL(huge.url).searchParams.get('size')).toBe('1280,960')
   })
 })

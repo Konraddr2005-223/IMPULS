@@ -7,7 +7,7 @@ export type ChecklistDraft = BoAgentProposal['checklist'][number]
 
 /**
  * Deterministic "Required documents & next steps" module from agent_prompt.md,
- * aligned with Kraków BO practice + Sąsiedzki land layer (GK).
+ * aligned with Kraków BO practice + IMPULS land layer (GK).
  */
 export function buildBoChecklist(parts: {
   title: string
@@ -31,7 +31,7 @@ export function buildBoChecklist(parts: {
     {
       id: 'support_list',
       label:
-        'Wydrukuj i zbierz podpisy na oficjalnej „Liście poparcia” (lajki w Sąsiedzkim tego nie zastępują).',
+        'Wydrukuj i zbierz podpisy na oficjalnej „Liście poparcia” (lajki w IMPULS tego nie zastępują).',
       required: true,
       reason: 'Wymóg formalny BO po złożeniu projektu w systemie miasta.',
     },
